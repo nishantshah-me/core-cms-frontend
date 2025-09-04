@@ -1,13 +1,10 @@
 import { paths } from 'src/routes/paths';
-
-import { CONFIG } from 'src/global-config';
-
 import { Label } from 'src/components/label';
 import { SvgColor } from 'src/components/svg-color';
 
 // ----------------------------------------------------------------------
 
-const icon = (name) => <SvgColor src={`${CONFIG.assetsDir}/assets/icons/navbar/${name}.svg`} />;
+const icon = (name) => <SvgColor src={`/assets/icons/navbar/${name}.svg`} />;
 
 const ICONS = {
   job: icon('ic-job'),
@@ -39,12 +36,13 @@ const ICONS = {
   dashboard: icon('ic-dashboard'),
 };
 
+console.log(paths);
+console.log('Paths');
+
 // ----------------------------------------------------------------------
 
 export const navData = [
-  /**
-   * Overview
-   */
+  /** * Overview */
   {
     // subheader: 'Overview',
     items: [
@@ -58,9 +56,7 @@ export const navData = [
       { title: 'Anayltics', path: paths.dashboard.three, icon: ICONS.analytics },
     ],
   },
-  /**
-   * Management
-   */
+  /** * Management */
   {
     subheader: 'Management',
     items: [

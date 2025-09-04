@@ -17,6 +17,25 @@ import { setSession, isValidToken } from './utils';
  * Customer will need to do some extra handling yourself if you want to extend the logic and other features...
  */
 
+const mockResponse = {
+  user: {
+    id: '8864c717-587d-472a-929a-8e5f298024da-0',
+    displayName: 'Jaydon Frankie',
+    photoURL: 'https://api-dev-minimal-v700.pages.dev/assets/images/avatar/avatar-25.webp',
+    phoneNumber: '+1 416-555-0198',
+    country: 'Canada',
+    address: '90210 Broadway Blvd',
+    state: 'California',
+    city: 'San Francisco',
+    zipCode: '94116',
+    about: 'Praesent turpis. Phasellus viverra nulla ut metus varius laoreet. Phasellus tempus.',
+    role: 'admin',
+    isPublic: true,
+    email: 'demo@minimals.cc',
+    password: '@2Minimal',
+  },
+};
+
 export function AuthProvider({ children }) {
   const { state, setState } = useSetState({ user: null, loading: true });
 
@@ -27,9 +46,9 @@ export function AuthProvider({ children }) {
       if (accessToken && isValidToken(accessToken)) {
         setSession(accessToken);
 
-        const res = await axios.get(endpoints.auth.me);
+        // const res = await axios.get(endpoints.auth.me);
 
-        const { user } = res.data;
+        const { user } = mockResponse;
 
         setState({ user: { ...user, accessToken }, loading: false });
       } else {

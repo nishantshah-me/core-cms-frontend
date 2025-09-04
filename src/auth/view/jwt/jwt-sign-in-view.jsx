@@ -24,6 +24,7 @@ import { useAuthContext } from '../../hooks';
 import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
 import { signInWithPassword } from '../../context/jwt';
+import { CONFIG } from 'src/global-config';
 
 // ----------------------------------------------------------------------
 
@@ -62,16 +63,18 @@ export function JwtSignInView() {
   } = methods;
 
   const onSubmit = handleSubmit(async (data) => {
-    try {
-      await signInWithPassword({ email: data.email, password: data.password });
-      await checkUserSession?.();
+    // try {
+    //   await signInWithPassword({ email: data.email, password: data.password });
+    //   await checkUserSession?.();
 
-      router.refresh();
-    } catch (error) {
-      console.error(error);
-      const feedbackMessage = getErrorMessage(error);
-      setErrorMessage(feedbackMessage);
-    }
+    //   router.refresh();
+    // } catch (error) {
+    //   console.error(error);
+    //   const feedbackMessage = getErrorMessage(error);
+    //   setErrorMessage(feedbackMessage);
+    // }
+
+    router.push(CONFIG.auth.redirectPath);
   });
 
   const renderForm = () => (

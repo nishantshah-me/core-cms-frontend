@@ -6,6 +6,7 @@ import { useRouter } from 'src/routes/hooks';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { signOut } from 'src/auth/context/jwt/action';
+import { paths } from 'src/routes/paths';
 
 // ----------------------------------------------------------------------
 
@@ -15,15 +16,17 @@ export function SignOutButton({ onClose, sx, ...other }) {
   const { checkUserSession } = useAuthContext();
 
   const handleLogout = useCallback(async () => {
-    try {
-      await signOut();
-      await checkUserSession?.();
+    // try {
+    //   await signOut();
+    //   await checkUserSession?.();
 
-      onClose?.();
-      router.refresh();
-    } catch (error) {
-      console.error(error);
-    }
+    //   onClose?.();
+    //   router.refresh();
+    // } catch (error) {
+    //   console.error(error);
+    // }
+
+    router.push(paths.auth.jwt.signIn);
   }, [checkUserSession, onClose, router]);
 
   return (

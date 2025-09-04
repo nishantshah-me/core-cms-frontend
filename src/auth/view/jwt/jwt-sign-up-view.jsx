@@ -25,6 +25,7 @@ import { useAuthContext } from '../../hooks';
 import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
 import { SignUpTerms } from '../../components/sign-up-terms';
+import { CONFIG } from 'src/global-config';
 
 // ----------------------------------------------------------------------
 
@@ -67,21 +68,22 @@ export function JwtSignUpView() {
   } = methods;
 
   const onSubmit = handleSubmit(async (data) => {
-    try {
-      await signUp({
-        email: data.email,
-        password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
-      });
-      await checkUserSession?.();
+    // try {
+    //   await signUp({
+    //     email: data.email,
+    //     password: data.password,
+    //     firstName: data.firstName,
+    //     lastName: data.lastName,
+    //   });
+    //   await checkUserSession?.();
 
-      router.refresh();
-    } catch (error) {
-      console.error(error);
-      const feedbackMessage = getErrorMessage(error);
-      setErrorMessage(feedbackMessage);
-    }
+    //   router.refresh();
+    // } catch (error) {
+    //   console.error(error);
+    //   const feedbackMessage = getErrorMessage(error);
+    //   setErrorMessage(feedbackMessage);
+    // }
+    router.push(CONFIG.auth.redirectPath);
   });
 
   const renderForm = () => (
