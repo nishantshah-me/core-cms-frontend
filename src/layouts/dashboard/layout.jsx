@@ -2,7 +2,7 @@
 
 import { merge } from 'es-toolkit';
 import { useBoolean } from 'minimal-shared/hooks';
-
+import { useState, useEffect, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
 import { useTheme } from '@mui/material/styles';
@@ -28,7 +28,7 @@ import { SettingsButton } from '../components/settings-button';
 import { LanguagePopover } from '../components/language-popover';
 import { ContactsPopover } from '../components/contacts-popover';
 import { WorkspacesPopover } from '../components/workspaces-popover';
-import { navData as dashboardNavData } from '../nav-config-dashboard';
+import { getNavData } from '../nav-config-dashboard';
 import { dashboardLayoutVars, dashboardNavColorVars } from './css-vars';
 import { NotificationsDrawer } from '../components/notifications-drawer';
 import { MainSection, layoutClasses, HeaderSection, LayoutSection } from '../core';
@@ -46,7 +46,50 @@ export function DashboardLayout({ sx, cssVars, children, slotProps, layoutQuery 
 
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
-  const navData = slotProps?.nav?.data ?? dashboardNavData;
+  // State to track the current workspace
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('selectedWorkspaceId') || 'team-1';
+    }
+    return 'team-1';
+  });
+
+  // Custom event listener for workspace changes
+  useEffect(() => {
+    const handleWorkspaceChange = (event) => {
+      const newWorkspaceId = event.detail.workspaceId;
+      console.log('Workspace change detected:', newWorkspaceId);
+      setSelectedWorkspaceId(newWorkspaceId);
+    };
+
+    // Listen for custom workspace change events
+    window.addEventListener('workspaceChanged', handleWorkspaceChange);
+
+    // Listen for storage changes (for cross-tab synchronization)
+    const handleStorageChange = (e) => {
+      if (e.key === 'selectedWorkspaceId' && e.newValue) {
+        console.log('Storage change detected:', e.newValue);
+        setSelectedWorkspaceId(e.newValue);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('workspaceChanged', handleWorkspaceChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // Compute navigation data based on current workspace
+  const currentNavData = useMemo(() => {
+    const navData = getNavData(selectedWorkspaceId);
+    console.log('Navigation data updated for workspace:', selectedWorkspaceId, navData);
+    return navData;
+  }, [selectedWorkspaceId]);
+
+  // Use the computed navData or fall back to slotProps
+  const navData = slotProps?.nav?.data ?? currentNavData;
 
   const isNavMini = settings.state.navLayout === 'mini';
   const isNavHorizontal = settings.state.navLayout === 'horizontal';
@@ -182,6 +225,10 @@ export function DashboardLayout({ sx, cssVars, children, slotProps, layoutQuery 
   const renderFooter = () => null;
 
   const renderMain = () => <MainSection {...slotProps?.main}>{children}</MainSection>;
+
+  // Debug logs
+  // console.log('Current workspace ID:', selectedWorkspaceId);
+  // console.log('Current nav data:', navData);
 
   return (
     <LayoutSection

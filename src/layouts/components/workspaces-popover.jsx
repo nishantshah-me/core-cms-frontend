@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { usePopover } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
@@ -24,15 +24,75 @@ export function WorkspacesPopover({ data = [], sx, ...other }) {
 
   const { open, anchorEl, onClose, onOpen } = usePopover();
 
-  const [workspace, setWorkspace] = useState(data[0]);
+  // Initialize workspace from localStorage if available
+  const [workspace, setWorkspace] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedWorkspaceId = localStorage.getItem('selectedWorkspaceId');
+      if (savedWorkspaceId) {
+        return data.find((item) => item.id === savedWorkspaceId) || data[0];
+      }
+    }
+    return data[0];
+  });
 
   const handleChangeWorkspace = useCallback(
     (newValue) => {
       setWorkspace(newValue);
+
+      // Save to localStorage
+      localStorage.setItem('selectedWorkspaceId', newValue.id);
+
+      // Emit custom event for other components to listen
+      const event = new CustomEvent('workspaceChanged', {
+        detail: { workspaceId: newValue.id, workspace: newValue },
+      });
+      window.dispatchEvent(event);
+
+      console.log('Workspace changed to:', newValue);
       onClose();
     },
     [onClose]
   );
+
+  // Listen for workspace changes from other sources (like page refresh or cross-tab changes)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'selectedWorkspaceId' && e.newValue) {
+        const newWorkspace = data.find((item) => item.id === e.newValue);
+        if (newWorkspace && newWorkspace.id !== workspace?.id) {
+          setWorkspace(newWorkspace);
+        }
+      }
+    };
+
+    const handleWorkspaceChange = (event) => {
+      const newWorkspace = event.detail.workspace;
+      if (newWorkspace && newWorkspace.id !== workspace?.id) {
+        setWorkspace(newWorkspace);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('workspaceChanged', handleWorkspaceChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('workspaceChanged', handleWorkspaceChange);
+    };
+  }, [data, workspace?.id]);
+
+  // Sync workspace on mount if localStorage has a value
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedWorkspaceId = localStorage.getItem('selectedWorkspaceId');
+      if (savedWorkspaceId && (!workspace || workspace.id !== savedWorkspaceId)) {
+        const savedWorkspace = data.find((item) => item.id === savedWorkspaceId);
+        if (savedWorkspace) {
+          setWorkspace(savedWorkspace);
+        }
+      }
+    }
+  }, [data, workspace]);
 
   const buttonBg = {
     height: 1,
@@ -114,7 +174,9 @@ export function WorkspacesPopover({ data = [], sx, ...other }) {
             <MenuItem
               key={option.id}
               selected={option.id === workspace?.id}
-              onClick={() => handleChangeWorkspace(option)}
+              onClick={() => {
+                handleChangeWorkspace(option);
+              }}
               sx={{ height: 48 }}
             >
               <Avatar alt={option.name} src={option.logo} sx={{ width: 24, height: 24 }} />
