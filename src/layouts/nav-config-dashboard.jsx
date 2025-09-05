@@ -35,6 +35,7 @@ const ICONS = {
   ecommerce: icon('ic-ecommerce'),
   analytics: icon('ic-analytics'),
   dashboard: icon('ic-dashboard'),
+  // owners: icon('ic-data-grid'),
 };
 
 // ----------------------------------------------------------------------
@@ -44,32 +45,34 @@ const _workspaces_Officeous = [
   {
     subheader: 'Overview',
     items: [
+      { title: 'App', path: paths.dashboard.root, icon: ICONS.dashboard },
       {
         title: 'Blogs',
-        path: paths.dashboard.root,
-        icon: ICONS.dashboard,
+        path: paths.dashboard.three,
+        icon: ICONS.blog,
         // info: <Label>v{CONFIG.appVersion}</Label>,
       },
       { title: 'Jobs', path: paths.dashboard.two, icon: ICONS.ecommerce },
       { title: 'Anayltics', path: paths.dashboard.three, icon: ICONS.analytics },
+      { title: 'Owners', path: paths.dashboard.owners, icon: ICONS.user },
     ],
   },
   /** * Management */
-  {
-    subheader: 'Management',
-    items: [
-      {
-        title: 'Group',
-        path: paths.dashboard.group.root,
-        icon: ICONS.user,
-        children: [
-          { title: 'Four', path: paths.dashboard.group.root },
-          { title: 'Five', path: paths.dashboard.group.five },
-          { title: 'Six', path: paths.dashboard.group.six },
-        ],
-      },
-    ],
-  },
+  // {
+  //   subheader: 'Management',
+  //   items: [
+  //     {
+  //       title: 'Group',
+  //       path: paths.dashboard.group.root,
+  //       icon: ICONS.user,
+  //       children: [
+  //         { title: 'Four', path: paths.dashboard.group.root },
+  //         { title: 'Five', path: paths.dashboard.group.five },
+  //         { title: 'Six', path: paths.dashboard.group.six },
+  //       ],
+  //     },
+  //   ],
+  // },
   /** * Misc */
   {
     subheader: 'Misc',
@@ -89,10 +92,11 @@ const _workspaces_Hexafold = [
   {
     subheader: 'Overview',
     items: [
+      { title: 'App', path: paths.dashboard.root, icon: ICONS.dashboard },
       {
         title: 'Blogs',
-        path: paths.dashboard.root,
-        icon: ICONS.dashboard,
+        path: paths.dashboard.three,
+        icon: ICONS.blog,
         // info: <Label>v{CONFIG.appVersion}</Label>,
       },
       { title: 'Jobs', path: paths.dashboard.two, icon: ICONS.ecommerce },
@@ -117,9 +121,10 @@ const _workspaces_Zeevaara = [
   {
     subheader: 'Misc',
     items: [
+      { title: 'App', path: paths.dashboard.root, icon: ICONS.dashboard },
       {
         title: 'Permission',
-        path: paths.dashboard.root,
+        path: paths.dashboard.three,
         icon: ICONS.lock,
         allowedRoles: ['admin', 'manager'],
         caption: 'Only admin can see this item.',
@@ -139,10 +144,11 @@ const _workspaces_Nivipi = [
   {
     subheader: 'Overview',
     items: [
+      { title: 'App', path: paths.dashboard.root, icon: ICONS.dashboard },
       {
         title: 'Blogs',
-        path: paths.dashboard.root,
-        icon: ICONS.dashboard,
+        path: paths.dashboard.three,
+        icon: ICONS.blog,
         // info: <Label>v{CONFIG.appVersion}</Label>,
       },
       { title: 'Jobs', path: paths.dashboard.two, icon: ICONS.ecommerce },
@@ -183,10 +189,11 @@ const _workspaces_InvoiceMaker = [
   {
     subheader: 'Overview',
     items: [
+      { title: 'App', path: paths.dashboard.root, icon: ICONS.dashboard },
       {
         title: 'Blogs',
-        path: paths.dashboard.root,
-        icon: ICONS.dashboard,
+        path: paths.dashboard.three,
+        icon: ICONS.blog,
         // info: <Label>v{CONFIG.appVersion}</Label>,
       },
       { title: 'Jobs', path: paths.dashboard.two, icon: ICONS.ecommerce },
@@ -227,10 +234,11 @@ const _workspaces_Blueray = [
   {
     subheader: 'Overview',
     items: [
+      { title: 'App', path: paths.dashboard.root, icon: ICONS.dashboard },
       {
         title: 'Blogs',
-        path: paths.dashboard.root,
-        icon: ICONS.dashboard,
+        path: paths.dashboard.three,
+        icon: ICONS.blog,
         // info: <Label>v{CONFIG.appVersion}</Label>,
       },
       { title: 'Jobs', path: paths.dashboard.two, icon: ICONS.ecommerce },

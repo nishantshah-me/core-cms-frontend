@@ -84,7 +84,7 @@ export function DashboardLayout({ sx, cssVars, children, slotProps, layoutQuery 
   // Compute navigation data based on current workspace
   const currentNavData = useMemo(() => {
     const navData = getNavData(selectedWorkspaceId);
-    console.log('Navigation data updated for workspace:', selectedWorkspaceId, navData);
+    // console.log('Navigation data updated for workspace:', selectedWorkspaceId, navData);
     return navData;
   }, [selectedWorkspaceId]);
 
