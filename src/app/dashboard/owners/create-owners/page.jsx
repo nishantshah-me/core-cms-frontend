@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+
 import {
   Box,
   Card,
@@ -13,7 +15,6 @@ import {
   Alert,
   Stack,
 } from '@mui/material';
-import { useRouter, useSearchParams } from 'next/navigation';
 
 const Page = () => {
   const router = useRouter();

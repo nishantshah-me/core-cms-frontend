@@ -1,3 +1,5 @@
+/* eslint-disable perfectionist/sort-imports */
+
 'use client';
 
 import { merge } from 'es-toolkit';

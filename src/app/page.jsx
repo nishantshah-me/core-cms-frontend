@@ -1,10 +1,12 @@
+/* eslint-disable perfectionist/sort-imports */
+
 'use client';
 
 import { useEffect } from 'react';
 
 import { useRouter } from 'src/routes/hooks';
 
-import { CONFIG } from 'src/global-config';
+// import { CONFIG } from 'src/global-config';
 import { paths } from 'src/routes/paths';
 
 // ----------------------------------------------------------------------

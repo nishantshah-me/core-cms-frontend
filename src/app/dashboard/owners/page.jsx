@@ -1,3 +1,5 @@
+/* eslint-disable perfectionist/sort-imports */
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -271,7 +273,7 @@ const Page = () => {
                 <TableCell>Email</TableCell>
                 <TableCell>Phone</TableCell>
                 <TableCell>Company</TableCell>
-                <TableCell width={88}></TableCell>
+                <TableCell width={88} />
               </TableRow>
             </TableHead>
             <TableBody>

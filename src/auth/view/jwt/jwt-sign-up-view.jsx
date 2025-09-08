@@ -1,3 +1,5 @@
+/* eslint-disable perfectionist/sort-imports */
+
 'use client';
 
 import * as z from 'zod';
@@ -20,9 +22,9 @@ import { RouterLink } from 'src/routes/components';
 import { Iconify } from 'src/components/iconify';
 import { Form, Field, schemaUtils } from 'src/components/hook-form';
 
-import { signUp } from '../../context/jwt';
+// import { signUp } from '../../context/jwt';
 import { useAuthContext } from '../../hooks';
-import { getErrorMessage } from '../../utils';
+// import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
 import { SignUpTerms } from '../../components/sign-up-terms';
 import { CONFIG } from 'src/global-config';
@@ -46,7 +48,7 @@ export function JwtSignUpView() {
 
   const showPassword = useBoolean();
 
-  const { checkUserSession } = useAuthContext();
+  // const { checkUserSession } = useAuthContext();
 
   const [errorMessage, setErrorMessage] = useState(null);
 

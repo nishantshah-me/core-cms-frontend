@@ -1,7 +1,9 @@
+/* eslint-disable perfectionist/sort-imports */
+
 import { paths } from 'src/routes/paths';
-import { Label } from 'src/components/label';
-import { SvgColor } from 'src/components/svg-color';
+// import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
+import { SvgColor } from 'src/components/svg-color';
 
 // ----------------------------------------------------------------------
 
