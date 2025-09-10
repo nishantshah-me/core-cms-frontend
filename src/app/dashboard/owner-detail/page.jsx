@@ -1,5 +1,16 @@
-'use client';
-import { Box, Card, Typography, Container, Avatar, Grid, Chip, Paper, Stack } from '@mui/material';
+import React from 'react';
+import {
+  Box,
+  Card,
+  Typography,
+  Container,
+  Avatar,
+  Grid,
+  Chip,
+  TextField,
+  CardContent,
+  InputAdornment,
+} from '@mui/material';
 import {
   Email as EmailIcon,
   Phone as PhoneIcon,
@@ -7,8 +18,11 @@ import {
   LocationOn as LocationIcon,
   Language as WebsiteIcon,
   People as PeopleIcon,
-  CalendarToday as CalendarIcon,
   Person as PersonIcon,
+  CheckCircle as CheckCircleIcon,
+  CreditCard as CreditCardIcon,
+  Factory as FactoryIcon,
+  MonetizationOn as MonetizationOnIcon,
 } from '@mui/icons-material';
 
 // Static owner data
@@ -32,301 +46,350 @@ const staticCompany = {
   companyURL: 'https://www.techsolutions.com',
 };
 
-const Page = () => {
+const App = () => {
   // Generate initials for avatar
   const getInitials = (firstName, lastName) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
   };
 
-  // Mock date - can be adjusted as needed
-  const joinDate = '08/09/2025';
-
-  const InfoItem = ({ icon: Icon, label, value, isLink = false }) => (
-    <Paper
-      elevation={0}
+  const ReadOnlyInput = ({ label, value, icon: Icon, isLink = false }) => (
+    <TextField
+      label={label}
+      value={value}
+      variant="outlined"
+      fullWidth
+      InputProps={{
+        readOnly: true,
+        startAdornment: (
+          <InputAdornment position="start">
+            <Box
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: 1,
+                backgroundColor: '#10b981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+              }}
+            >
+              <Icon sx={{ fontSize: 18 }} />
+            </Box>
+          </InputAdornment>
+        ),
+      }}
       sx={{
-        p: 3,
-        borderRadius: 2,
-        backgroundColor: '#ffffff',
-        border: '1px solid #e5e7eb',
-        transition: 'all 0.2s ease-in-out',
-        '&:hover': {
+        '& .MuiOutlinedInput-root': {
           backgroundColor: '#f9fafb',
-          transform: 'translateY(-1px)',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          '& fieldset': {
+            borderColor: '#e5e7eb',
+          },
+          '&:hover fieldset': {
+            borderColor: '#10b981',
+          },
+          '&.Mui-focused fieldset': {
+            borderColor: '#10b981',
+          },
+        },
+        '& .MuiInputLabel-root': {
+          color: '#6b7280',
+          fontSize: '0.875rem',
+          fontWeight: 500,
+        },
+        '& .MuiInputBase-input': {
+          color: isLink ? '#10b981' : '#374151',
+          fontWeight: 500,
+          cursor: isLink ? 'pointer' : 'default',
         },
       }}
-    >
-      <Stack spacing={2}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Box
-            sx={{
-              p: 1,
-              borderRadius: 1.5,
-              backgroundColor: '#10b981',
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon fontSize="small" />
-          </Box>
-          <Typography
-            variant="caption"
-            color="#6b7280"
-            fontWeight="500"
-            textTransform="uppercase"
-            letterSpacing={0.5}
-          >
-            {label}
-          </Typography>
-        </Box>
-        <Typography
-          variant="body1"
-          fontWeight="600"
-          color={isLink ? '#10b981' : '#374151'}
-          sx={{
-            cursor: isLink ? 'pointer' : 'default',
-            '&:hover': isLink ? { textDecoration: 'underline' } : {},
-          }}
-        >
-          {value}
-        </Typography>
-      </Stack>
-    </Paper>
+    />
   );
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="700" color="#1f2937">
+        <Typography
+          variant="h3"
+          sx={{
+            fontWeight: 700,
+            color: '#1a1a1a',
+            mb: 1,
+          }}
+        >
           Owner Profile
         </Typography>
-        <Typography variant="body1" color="#6b7280" sx={{ mt: 1 }}>
+        <Typography variant="h6" color="#666" sx={{ fontWeight: 400 }}>
           Comprehensive owner information and company details
         </Typography>
       </Box>
 
+      {/* Profile Header Card */}
       <Card
         sx={{
           mb: 4,
-          borderRadius: 3,
+          borderRadius: 4,
           overflow: 'hidden',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          border: '1px solid #e5e7eb',
+          backgroundColor: '#374151',
         }}
       >
-        <Box
-          sx={{
-            background: '#374151',
-            p: 4,
-            color: 'white',
-            position: 'relative',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <Avatar
-              sx={{
-                width: 80,
-                height: 80,
-                backgroundColor: '#10b981',
-                fontSize: '2rem',
-                fontWeight: '600',
-                border: '2px solid rgba(255,255,255,0.2)',
-              }}
-            >
-              {getInitials(staticOwner.firstName, staticOwner.lastName)}
-            </Avatar>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="h4" fontWeight="600" gutterBottom>
-                {staticOwner.firstName} {staticOwner.lastName}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <PersonIcon fontSize="small" />
-                <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: '400' }}>
-                  Owner
+        <CardContent sx={{ p: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <Avatar
+                sx={{
+                  width: 80,
+                  height: 80,
+                  backgroundColor: '#10b981',
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  border: '2px solid rgba(255,255,255,0.2)',
+                }}
+              >
+                {getInitials(staticOwner.firstName, staticOwner.lastName)}
+              </Avatar>
+              <Box>
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 700,
+                    color: 'white',
+                    mb: 1,
+                  }}
+                >
+                  {staticOwner.firstName} {staticOwner.lastName}
                 </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <LocationIcon fontSize="small" />
-                <Typography variant="body1" sx={{ opacity: 0.8 }}>
-                  {staticCompany?.companyAddress || 'Address not available'}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <PersonIcon sx={{ color: '#10b981', fontSize: 20 }} />
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      color: 'rgba(255,255,255,0.9)',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Owner
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <LocationIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 18 }} />
+                  <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                    {staticCompany?.companyAddress || 'Address not available'}
+                  </Typography>
+                </Box>
               </Box>
             </Box>
+            <Chip
+              icon={<CheckCircleIcon />}
+              label="Active"
+              sx={{
+                backgroundColor: '#10b981',
+                color: 'white',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                height: 40,
+                '& .MuiChip-icon': {
+                  color: 'white',
+                },
+              }}
+            />
           </Box>
-          <Chip
-            label="Active"
-            sx={{
-              position: 'absolute',
-              top: 20,
-              right: 20,
-              backgroundColor: '#10b981',
-              color: 'white',
-              fontWeight: '500',
-              '& .MuiChip-label': { px: 2 },
-            }}
-          />
-        </Box>
+        </CardContent>
       </Card>
 
+      {/* Personal Information */}
       <Card
         sx={{
           mb: 4,
-          borderRadius: 3,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          border: '1px solid #e5e7eb',
+          borderRadius: 4,
+          border: '1px solid #e0e0e0',
+          overflow: 'hidden',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
         }}
       >
         <Box
           sx={{
             p: 4,
-            borderBottom: '1px solid #e5e7eb',
-            backgroundColor: '#ffffff',
+            backgroundColor: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
           }}
         >
-          <Typography variant="h5" fontWeight="600" color="#1f2937">
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 700,
+              color: '#1a1a1a',
+              mb: 1,
+            }}
+          >
             Personal Information
           </Typography>
-          <Typography variant="body2" color="#6b7280" sx={{ mt: 1 }}>
+          <Typography variant="body1" color="#666">
             Personal details and contact information
           </Typography>
         </Box>
 
-        <Box sx={{ p: 4, backgroundColor: '#f9fafb' }}>
+        <CardContent sx={{ p: 4 }}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={3}>
-              <InfoItem icon={PersonIcon} label="First Name" value={staticOwner.firstName} />
+              <ReadOnlyInput label="First Name" value={staticOwner.firstName} icon={PersonIcon} />
             </Grid>
             <Grid item xs={12} md={3}>
-              <InfoItem icon={PersonIcon} label="Last Name" value={staticOwner.lastName} />
+              <ReadOnlyInput label="Last Name" value={staticOwner.lastName} icon={PersonIcon} />
             </Grid>
             <Grid item xs={12} md={3}>
-              <InfoItem icon={EmailIcon} label="Email Address" value={staticOwner.email} isLink />
+              <ReadOnlyInput
+                label="Email Address"
+                value={staticOwner.email}
+                icon={EmailIcon}
+                isLink
+              />
             </Grid>
             <Grid item xs={12} md={3}>
-              <InfoItem icon={PhoneIcon} label="Phone Number" value={staticOwner.phone} isLink />
+              <ReadOnlyInput
+                label="Phone Number"
+                value={staticOwner.phone}
+                icon={PhoneIcon}
+                isLink
+              />
             </Grid>
           </Grid>
-        </Box>
+        </CardContent>
       </Card>
 
+      {/* Company Information */}
       {staticCompany && (
         <Card
           sx={{
-            borderRadius: 3,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            border: '1px solid #e5e7eb',
+            mb: 4,
+            borderRadius: 4,
+            border: '1px solid #e0e0e0',
+            overflow: 'hidden',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
           }}
         >
           <Box
             sx={{
               p: 4,
-              borderBottom: '1px solid #e5e7eb',
-              backgroundColor: '#ffffff',
+              backgroundColor: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
             }}
           >
-            <Typography variant="h5" fontWeight="600" color="#1f2937">
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 700,
+                color: '#1a1a1a',
+                mb: 1,
+              }}
+            >
               Company Information
             </Typography>
-            <Typography variant="body2" color="#6b7280" sx={{ mt: 1 }}>
+            <Typography variant="body1" color="#666">
               Business details and company information
             </Typography>
           </Box>
 
-          <Box sx={{ p: 4, backgroundColor: '#f9fafb' }}>
+          <CardContent sx={{ p: 4 }}>
             <Grid container spacing={3}>
               <Grid item xs={12} md={3}>
-                <InfoItem
-                  icon={BusinessIcon}
+                <ReadOnlyInput
                   label="Company Name"
                   value={staticCompany.companyName}
+                  icon={BusinessIcon}
                 />
               </Grid>
               <Grid item xs={12} md={3}>
-                <InfoItem
-                  icon={BusinessIcon}
+                <ReadOnlyInput
                   label="Industry Type"
                   value={staticCompany.industryType}
+                  icon={FactoryIcon}
                 />
               </Grid>
               <Grid item xs={12} md={3}>
-                <InfoItem
-                  icon={PeopleIcon}
+                <ReadOnlyInput
                   label="Employee Count"
                   value={staticCompany.employeeCount}
+                  icon={PeopleIcon}
                 />
               </Grid>
               <Grid item xs={12} md={3}>
-                <InfoItem
-                  icon={EmailIcon}
+                <ReadOnlyInput
                   label="Company Email"
                   value={staticCompany.companyEmail}
+                  icon={EmailIcon}
                   isLink
                 />
               </Grid>
-              <Grid item xs={12} md={3}>
-                <InfoItem
-                  icon={WebsiteIcon}
+              <Grid item xs={12} md={6}>
+                <ReadOnlyInput
                   label="Company Website"
                   value={staticCompany.companyURL}
+                  icon={WebsiteIcon}
                   isLink
                 />
               </Grid>
-              <Grid item xs={12} md={3}>
-                <InfoItem
-                  icon={LocationIcon}
+              <Grid item xs={12} md={6}>
+                <ReadOnlyInput
                   label="Company Address"
                   value={staticCompany.companyAddress}
+                  icon={LocationIcon}
+                  rows={3}
                 />
               </Grid>
             </Grid>
-          </Box>
+          </CardContent>
         </Card>
       )}
 
-      {staticCompany && (
-        <Card
+      {/* Pricing Plan */}
+      <Card
+        sx={{
+          borderRadius: 4,
+          border: '1px solid #e0e0e0',
+          overflow: 'hidden',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+        }}
+      >
+        <Box
           sx={{
-            borderRadius: 3,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            border: '1px solid #e5e7eb',
-            mt: 4,
+            p: 4,
+            backgroundColor: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
           }}
         >
-          <Box
+          <Typography
+            variant="h5"
             sx={{
-              p: 4,
-              borderBottom: '1px solid #e5e7eb',
-              backgroundColor: '#ffffff',
+              fontWeight: 700,
+              color: '#1a1a1a',
+              mb: 1,
             }}
           >
-            <Typography variant="h5" fontWeight="600" color="#1f2937">
-              Pricing Plan
-            </Typography>
-            <Typography variant="body2" color="#6b7280" sx={{ mt: 1 }}>
-              Current subscription and billing information
-            </Typography>
-          </Box>
+            Pricing Plan
+          </Typography>
+          <Typography variant="body1" color="#666">
+            Current subscription and billing information
+          </Typography>
+        </Box>
 
-          <Box sx={{ p: 4, backgroundColor: '#f9fafb' }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <InfoItem icon={BusinessIcon} label="Plan Name" value="Pro Plan" />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <InfoItem icon={CalendarIcon} label="Price" value="$24.99/month" />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <InfoItem icon={PersonIcon} label="Status" value="Active" />
-              </Grid>
+        <CardContent sx={{ p: 4 }}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+              <ReadOnlyInput label="Plan Name" value="Pro Plan" icon={MonetizationOnIcon} />{' '}
             </Grid>
-          </Box>
-        </Card>
-      )}
+            <Grid item xs={12} md={4}>
+              <ReadOnlyInput label="Price" value="$24.99/month" icon={CreditCardIcon} />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <ReadOnlyInput label="Status" value="Active" icon={CheckCircleIcon} />
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
     </Container>
   );
 };
 
-export default Page;
+export default App;

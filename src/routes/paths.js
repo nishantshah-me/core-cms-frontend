@@ -46,6 +46,7 @@ export const paths = {
     two: `${ROOTS.DASHBOARD}/two`,
     three: `${ROOTS.DASHBOARD}/three`,
     owners: `${ROOTS.DASHBOARD}/owners`,
+    owners_Test: `${ROOTS.DASHBOARD}/owners-2`,
     company: `${ROOTS.DASHBOARD}/company`,
     onboarding: `${ROOTS.DASHBOARD}/onboarding`,
     group: {

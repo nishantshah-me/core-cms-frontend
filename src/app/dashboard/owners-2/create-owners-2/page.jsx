@@ -20,11 +20,22 @@ import {
   InputLabel,
   Select,
   FormHelperText,
+  Grid,
   Chip,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ToggleButton,
+  ToggleButtonGroup,
   Paper,
   MenuItem,
 } from '@mui/material';
-import { ArrowBack as ArrowBackIcon, Check as CheckIcon } from '@mui/icons-material';
+import {
+  ArrowBack as ArrowBackIcon,
+  ArrowForward as ArrowForwardIcon,
+  Check as CheckIcon,
+} from '@mui/icons-material';
 
 // Industry and employee count options
 const industryOptions = [
@@ -52,7 +63,89 @@ const industryOptions = [
 
 const employeeCountOptions = ['1-50', '51-100', '101-500', '501-1000', '1000+'];
 
-const steps = ['Owner Onboarding', 'Company Onboarding'];
+// Pricing plans data
+const pricingPlans = [
+  {
+    id: 'free',
+    name: 'Free Plans',
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    originalMonthlyPrice: 20.99,
+    originalYearlyPrice: 20.99,
+    description: 'Basic features for up to 5 users with unlimited projects and reporting',
+    features: [
+      'Max 10 A & production features',
+      'Adjust for local languages & loc data',
+      'Manage online payments',
+      'Set up automated payment reminders',
+    ],
+    isRecommended: false,
+    color: 'primary',
+  },
+  {
+    id: 'basic',
+    name: 'Basic Plans',
+    monthlyPrice: 14.99,
+    yearlyPrice: 134.99,
+    originalMonthlyPrice: 34.99,
+    originalYearlyPrice: 334.99,
+    description: 'Basic features for up to 25 users with unlimited projects and reporting',
+    features: [
+      'Create quotes and RFP compliant',
+      'Adjust for local languages & loc data',
+      'Perfect multi-currency transactions',
+      'Manage online payments',
+      'Set up automated payment reminders',
+    ],
+    isRecommended: false,
+    color: 'info',
+  },
+  {
+    id: 'pro',
+    name: 'Pro Plans',
+    monthlyPrice: 24.99,
+    yearlyPrice: 234.99,
+    originalMonthlyPrice: 54.99,
+    originalYearlyPrice: 534.99,
+    description: 'Basic features for up to 100 users with unlimited projects and reporting',
+    features: [
+      'Create quotes and RFP compliant bookings',
+      'Adjust for local languages & loc data',
+      'Perfect multi-currency transactions',
+      'Manage online payments',
+      'Set up automated payment reminders',
+      'Offer a zero direct API service custom graphics',
+      'Automate your transaction templates',
+      'Use custom domains',
+    ],
+    isRecommended: true,
+    color: 'warning',
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise Plans',
+    monthlyPrice: 34.99,
+    yearlyPrice: 334.99,
+    originalMonthlyPrice: 54.99,
+    originalYearlyPrice: 534.99,
+    description: 'Basic features for up to unlimited users with unlimited projects and reporting',
+    features: [
+      'Create quotes and RFP compliant bookings',
+      'Adjust for local languages & loc data',
+      'Perfect multi-currency transactions',
+      'Manage online payments',
+      'Set up automated payment reminders',
+      'Offer a zero direct API service custom graphics',
+      'Guarantee plus transaction templates',
+      'Enterprise business workflows',
+      'Generate detailed 24/7 reports',
+    ],
+    isRecommended: false,
+    color: 'success',
+  },
+];
+
+const steps = ['Owner Onboarding', 'Company Onboarding', 'Pricing Plan'];
 
 const Page = () => {
   const router = useRouter();
@@ -90,7 +183,9 @@ const Page = () => {
   });
   const [companyErrors, setCompanyErrors] = useState({});
 
-  // Submission state
+  // Pricing state
+  const [billingCycle, setBillingCycle] = useState('monthly');
+  const [selectedPlan, setSelectedPlan] = useState('pro');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -139,6 +234,10 @@ const Page = () => {
             employeeCount: parsedEditData.company.employeeCount || '',
             companyURL: parsedEditData.company.companyURL || '',
           });
+
+          // Populate pricing data
+          setSelectedPlan(parsedEditData.pricing.selectedPlan || 'pro');
+          setBillingCycle(parsedEditData.pricing.billingCycle || 'monthly');
         } catch (error) {
           console.error('Error parsing edit data:', error);
         }
@@ -160,6 +259,8 @@ const Page = () => {
         employeeCount: '',
         companyURL: '',
       });
+      setSelectedPlan('pro');
+      setBillingCycle('monthly');
     }
   }, [searchParams]);
 
@@ -346,6 +447,11 @@ const Page = () => {
       if (!validateOwnerForm()) {
         return;
       }
+    } else if (activeStep === 1) {
+      // Validate company data
+      if (!validateCompanyForm()) {
+        return;
+      }
     }
 
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -355,12 +461,17 @@ const Page = () => {
     setActiveStep((prevActiveStep) => prevActiveStep - 1);
   };
 
-  const handleFinalSubmit = async () => {
-    // Validate company form before submitting
-    if (!validateCompanyForm()) {
-      return;
+  const handleBillingCycleChange = (event, newBillingCycle) => {
+    if (newBillingCycle !== null) {
+      setBillingCycle(newBillingCycle);
     }
+  };
 
+  const handlePlanSelect = (planId) => {
+    setSelectedPlan(planId);
+  };
+
+  const handleFinalSubmit = async () => {
     setIsSubmitting(true);
 
     try {
@@ -384,6 +495,8 @@ const Page = () => {
               email: ownerFormData.email,
               phone: ownerFormData.phone,
               company: companyFormData.companyName,
+              planId: selectedPlan,
+              billingCycle: billingCycle,
               companyData: companyFormData,
             };
           }
@@ -404,6 +517,8 @@ const Page = () => {
             phone: ownerFormData.phone,
           },
           company: companyFormData,
+          selectedPlan,
+          billingCycle,
           createdAt: new Date().toISOString(),
         };
 
@@ -451,6 +566,19 @@ const Page = () => {
             gap: 2,
           }}
         >
+          {/* Full Name - spans full width */}
+          {/* <Box sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }}>
+            <TextField
+              fullWidth
+              label="Full Name"
+              value={ownerFormData.fullName}
+              onChange={handleOwnerInputChange('fullName')}
+              error={Boolean(ownerErrors.fullName)}
+              helperText={ownerErrors.fullName}
+              required
+            />
+          </Box> */}
+
           <TextField
             fullWidth
             label="Full Name"
@@ -733,6 +861,129 @@ const Page = () => {
     </Box>
   );
 
+  const renderPricingStep = () => (
+    <Box>
+      <Card sx={{ p: 4 }}>
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Typography variant="h4" gutterBottom>
+            Pricing Plan
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Please select your pricing plan
+          </Typography>
+
+          {/* Billing Cycle Toggle */}
+          <ToggleButtonGroup
+            value={billingCycle}
+            exclusive
+            onChange={handleBillingCycleChange}
+            sx={{ mb: 4 }}
+          >
+            <ToggleButton value="monthly" sx={{ px: 3, py: 1 }}>
+              Monthly
+            </ToggleButton>
+            <ToggleButton value="yearly" sx={{ px: 3, py: 1 }}>
+              Yearly
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+
+        {/* Pricing Cards */}
+        <Grid container spacing={3}>
+          {pricingPlans.map((plan) => (
+            <Grid item xs={12} sm={6} md={3} key={plan.id}>
+              <Paper
+                elevation={selectedPlan === plan.id ? 8 : 2}
+                sx={{
+                  p: 3,
+                  height: '100%',
+                  position: 'relative',
+                  border: selectedPlan === plan.id ? 2 : 1,
+                  borderColor: selectedPlan === plan.id ? `${plan.color}.main` : 'divider',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    elevation: 4,
+                    transform: 'translateY(-2px)',
+                  },
+                }}
+                onClick={() => handlePlanSelect(plan.id)}
+              >
+                {plan.isRecommended && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: -10,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                    }}
+                  >
+                    <Chip
+                      label="Recommend for you"
+                      color="warning"
+                      size="small"
+                      sx={{ fontWeight: 'bold' }}
+                    />
+                  </Box>
+                )}
+
+                <Box sx={{ textAlign: 'center', mb: 2 }}>
+                  <Typography variant="h6" gutterBottom>
+                    {plan.name}
+                  </Typography>
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="h4" component="span" color={`${plan.color}.main`}>
+                      ${billingCycle === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice}
+                    </Typography>
+                    {plan.monthlyPrice > 0 && (
+                      <Typography
+                        variant="body2"
+                        component="span"
+                        sx={{ textDecoration: 'line-through', ml: 1, color: 'text.secondary' }}
+                      >
+                        $
+                        {billingCycle === 'monthly'
+                          ? plan.originalMonthlyPrice
+                          : plan.originalYearlyPrice}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {plan.description}
+                  </Typography>
+                </Box>
+
+                <Button
+                  fullWidth
+                  variant={selectedPlan === plan.id ? 'contained' : 'outlined'}
+                  color={plan.color}
+                  sx={{ mb: 2 }}
+                  onClick={() => handlePlanSelect(plan.id)}
+                >
+                  Select Plan
+                </Button>
+
+                <List dense>
+                  {plan.features.map((feature, index) => (
+                    <ListItem key={index} sx={{ px: 0, py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 30 }}>
+                        <CheckIcon fontSize="small" color={plan.color} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={feature}
+                        primaryTypographyProps={{ variant: 'body2' }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+      </Card>
+    </Box>
+  );
+
   // Check if Continue button should be enabled
   const isContinueDisabled = () => {
     if (activeStep === 0) {
@@ -756,7 +1007,7 @@ const Page = () => {
           <Link color="inherit" href="/dashboard">
             Dashboard
           </Link>
-          <Link color="inherit" href="/dashboard/owners">
+          <Link color="inherit" href="/dashboard/owners-2">
             Owner
           </Link>
           <Typography color="text.primary">{isEdit ? 'Edit' : 'Create'}</Typography>
@@ -776,6 +1027,7 @@ const Page = () => {
       <Box sx={{ mb: 4 }}>
         {activeStep === 0 && renderOwnerStep()}
         {activeStep === 1 && renderCompanyStep()}
+        {activeStep === 2 && renderPricingStep()}
       </Box>
 
       {/* Navigation Buttons */}
@@ -805,7 +1057,12 @@ const Page = () => {
                 : 'Create Account'}
           </Button>
         ) : (
-          <Button onClick={handleNext} variant="contained" disabled={isContinueDisabled()}>
+          <Button
+            onClick={handleNext}
+            endIcon={<ArrowForwardIcon />}
+            variant="contained"
+            disabled={isContinueDisabled()}
+          >
             Continue
           </Button>
         )}

@@ -45,6 +45,8 @@ const initialOwners = [
     phone: '+1 234 567 8900',
     company: 'Tech Solutions Inc',
     companyId: 1,
+    planId: 'pro',
+    billingCycle: 'monthly',
   },
   {
     id: 2,
@@ -54,6 +56,8 @@ const initialOwners = [
     phone: '+1 234 567 8901',
     company: 'Innovation Labs',
     companyId: 2,
+    planId: 'basic',
+    billingCycle: 'yearly',
   },
   {
     id: 3,
@@ -63,6 +67,8 @@ const initialOwners = [
     phone: '+1 234 567 8902',
     company: 'Enterprise Corp',
     companyId: 3,
+    planId: 'enterprise',
+    billingCycle: 'monthly',
   },
   {
     id: 4,
@@ -72,6 +78,8 @@ const initialOwners = [
     phone: '+1 234 567 8903',
     company: 'Creative Agency',
     companyId: 4,
+    planId: 'free',
+    billingCycle: 'monthly',
   },
 ];
 
@@ -119,6 +127,8 @@ const Page = () => {
               phone: onboardingData.owner.phone,
               company: onboardingData.company.companyName,
               companyId: Date.now() + 1,
+              planId: onboardingData.selectedPlan,
+              billingCycle: onboardingData.billingCycle,
               companyData: onboardingData.company, // Store complete company data
             };
 
@@ -193,6 +203,10 @@ const Page = () => {
           companyAddress: '',
           employeeCount: '',
           companyURL: '',
+        },
+        pricing: {
+          selectedPlan: selectedOwner.planId,
+          billingCycle: selectedOwner.billingCycle,
         },
       };
 
@@ -275,7 +289,7 @@ const Page = () => {
           <Link color="inherit" href="/dashboard">
             Dashboard
           </Link>
-          <Link color="inherit" href="/dashboard/owners">
+          <Link color="inherit" href="/dashboard/owners-2">
             Owners
           </Link>
         </Breadcrumbs>

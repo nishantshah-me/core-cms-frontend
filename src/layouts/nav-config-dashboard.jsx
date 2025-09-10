@@ -57,6 +57,7 @@ const _workspaces_Officeous = [
       { title: 'Jobs', path: paths.dashboard.two, icon: ICONS.ecommerce },
       { title: 'Anayltics', path: paths.dashboard.three, icon: ICONS.analytics },
       { title: 'Owners', path: paths.dashboard.owners, icon: ICONS.user },
+      { title: 'Owners Test', path: paths.dashboard.owners_Test, icon: ICONS.user },
       // { title: 'Company', path: paths.dashboard.company, icon: ICONS.course },
       // { title: 'Onboarding', path: paths.dashboard.onboarding, icon: ICONS.course },
     ],

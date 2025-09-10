@@ -5,7 +5,6 @@
 import * as z from 'zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useBoolean } from 'minimal-shared/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
@@ -24,15 +23,15 @@ import { Form, Field, schemaUtils } from 'src/components/hook-form';
 import { CONFIG } from 'src/global-config';
 
 import { useAuthContext } from '../../hooks';
-// import { getErrorMessage } from '../../utils';
 
 import { FormHead } from '../../components/form-head';
-// import { signInWithPassword } from '../../context/jwt';
+
+import { signInWithPassword } from 'src/auth/services/authService';
 
 // ----------------------------------------------------------------------
 
 export const SignInSchema = z.object({
-  email: schemaUtils.email(),
+  username: z.string().min(1, { message: 'Username is required' }),
   password: z
     .string()
     .min(1, { message: 'Password is required!' })
@@ -43,16 +42,13 @@ export const SignInSchema = z.object({
 
 export function JwtSignInView() {
   const router = useRouter();
-
-  const showPassword = useBoolean();
-
   const { checkUserSession } = useAuthContext();
 
   const [errorMessage, setErrorMessage] = useState(null);
-
+  const [showPassword, setShowPassword] = useState(false);
   const defaultValues = {
-    email: 'demo@minimals.cc',
-    password: '@2Minimal',
+    username: 'nishant',
+    password: 'Nishant@123',
   };
 
   const methods = useForm({
@@ -66,23 +62,26 @@ export function JwtSignInView() {
   } = methods;
 
   const onSubmit = handleSubmit(async (data) => {
-    // try {
-    //   await signInWithPassword({ email: data.email, password: data.password });
-    //   await checkUserSession?.();
+    setErrorMessage(null);
+    try {
+      // call backend login
+      await signInWithPassword({ username: data.username, password: data.password });
 
-    //   router.refresh();
-    // } catch (error) {
-    //   console.error(error);
-    //   const feedbackMessage = getErrorMessage(error);
-    //   setErrorMessage(feedbackMessage);
-    // }
+      // optional: tell your auth context to re-check session (if implemented)
+      await checkUserSession?.();
 
-    router.push(CONFIG.auth.redirectPath);
+      // redirect after successful login
+      router.push(CONFIG.auth.redirectPath);
+    } catch (error) {
+      console.error('Login error', error);
+      const msg = error?.message || error?.detail || JSON.stringify(error);
+      setErrorMessage(msg || 'Login failed');
+    }
   });
 
   const renderForm = () => (
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
-      <Field.Text name="email" label="Email address" slotProps={{ inputLabel: { shrink: true } }} />
+      <Field.Text name="username" label="Username" slotProps={{ inputLabel: { shrink: true } }} />
 
       <Box sx={{ gap: 1.5, display: 'flex', flexDirection: 'column' }}>
         <Link
@@ -99,16 +98,15 @@ export function JwtSignInView() {
           name="password"
           label="Password"
           placeholder="6+ characters"
-          type={showPassword.value ? 'text' : 'password'}
+          type={showPassword ? 'text' : 'password'} // toggle input type
           slotProps={{
             inputLabel: { shrink: true },
             input: {
               endAdornment: (
                 <InputAdornment position="end">
-                  <IconButton onClick={showPassword.onToggle} edge="end">
-                    <Iconify
-                      icon={showPassword.value ? 'solar:eye-bold' : 'solar:eye-closed-bold'}
-                    />
+                  <IconButton onClick={() => setShowPassword((prev) => !prev)} edge="end">
+                    <Iconify icon={showPassword ? 'solar:eye-bold' : 'solar:eye-closed-bold'} />
+                    {/* toggle between eye open / closed */}
                   </IconButton>
                 </InputAdornment>
               ),
@@ -123,10 +121,9 @@ export function JwtSignInView() {
         size="large"
         type="submit"
         variant="contained"
-        loading={isSubmitting}
-        loadingIndicator="Sign in..."
+        disabled={isSubmitting}
       >
-        Sign in
+        {isSubmitting ? 'Signing in...' : 'Sign in'}
       </Button>
     </Box>
   );
@@ -147,8 +144,7 @@ export function JwtSignInView() {
       />
 
       <Alert severity="info" sx={{ mb: 3 }}>
-        Use <strong>{defaultValues.email}</strong>
-        {' with password '}
+        Use <strong>{defaultValues.username}</strong> with password{' '}
         <strong>{defaultValues.password}</strong>
       </Alert>
 
