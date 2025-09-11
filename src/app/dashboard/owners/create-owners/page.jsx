@@ -23,31 +23,20 @@ import {
   Chip,
   Paper,
   MenuItem,
+  Alert,
 } from '@mui/material';
 import { ArrowBack as ArrowBackIcon, Check as CheckIcon } from '@mui/icons-material';
+import { sendOwnerOTP, verifyOwnerOTP, createCompany } from 'src/auth/services/ownerCompanyService';
+import toast from 'react-hot-toast';
 
 // Industry and employee count options
 const industryOptions = [
-  'Information Technology',
+  'IT Services',
   'Healthcare',
-  'Education',
-  'Real Estate',
-  'Banking',
   'Finance',
+  'Education',
   'Manufacturing',
-  'Retail',
-  'Marketing & Advertising',
-  'Research & Development',
-  'Financial Services',
-  'Construction',
-  'Transportation',
-  'Energy',
-  'Entertainment',
-  'Food & Beverage',
-  'Consulting',
-  'Non-profit',
-  'Government',
-  'Other',
+  'Others',
 ];
 
 const employeeCountOptions = ['1-50', '51-100', '101-500', '501-1000', '1000+'];
@@ -57,9 +46,22 @@ const steps = ['Owner Onboarding', 'Company Onboarding'];
 const Page = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return Number(localStorage.getItem('active_step')) || 0;
+    }
+    return 0;
+  });
+
   const [isEdit, setIsEdit] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [error, setError] = useState('');
+  const [createdOwnerId, setCreatedOwnerId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('created_owner_id') || null;
+    }
+    return null;
+  });
 
   // Owner state
   const [ownerFormData, setOwnerFormData] = useState({
@@ -139,8 +141,12 @@ const Page = () => {
             employeeCount: parsedEditData.company.employeeCount || '',
             companyURL: parsedEditData.company.companyURL || '',
           });
+
+          // Skip OTP verification for edit mode
+          setOtpState((prev) => ({ ...prev, isEmailVerified: true }));
         } catch (error) {
-          console.error('Error parsing edit data:', error);
+          toast.error(`Error parsing edit data: ${error}`);
+          setError('Error loading edit data');
         }
       }
     } else {
@@ -160,6 +166,17 @@ const Page = () => {
         employeeCount: '',
         companyURL: '',
       });
+      setOtpState({
+        isEmailVerified: false,
+        otpSent: false,
+        otp: ['', '', '', '', '', ''],
+        isVerifying: false,
+        isSending: false,
+        resendTimer: 0,
+        otpError: '',
+      });
+      setActiveStep(0);
+      localStorage.setItem('active_step', 0);
     }
   }, [searchParams]);
 
@@ -186,6 +203,11 @@ const Page = () => {
         [field]: '',
       }));
     }
+
+    // Clear general error
+    if (error) {
+      setError('');
+    }
   };
 
   const handleSendOTP = async () => {
@@ -194,24 +216,39 @@ const Page = () => {
       return;
     }
 
+    if (!ownerFormData.fullName.trim()) {
+      setOwnerErrors((prev) => ({ ...prev, fullName: 'Please enter your full name' }));
+      return;
+    }
+
+    if (!ownerFormData.phone.trim()) {
+      setOwnerErrors((prev) => ({ ...prev, phone: 'Please enter your phone number' }));
+      return;
+    }
+
     setOtpState((prev) => ({ ...prev, isSending: true, otpError: '' }));
+    setError('');
 
     try {
-      // Simulate API call to send OTP
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const otpData = {
+        username: ownerFormData.fullName.trim(),
+        email: ownerFormData.email.trim(),
+        phone: ownerFormData.phone.trim(),
+      };
 
       setOtpState((prev) => ({
         ...prev,
         otpSent: true,
         isSending: false,
-        resendTimer: 120,
+        resendTimer: 60,
         otp: ['', '', '', '', '', ''],
       }));
-    } catch (error) {
+    } catch (err) {
+      toast.error(`OTP send error: ${err}`);
+      setError(err.message || 'Failed to send OTP. Please try again.');
       setOtpState((prev) => ({
         ...prev,
         isSending: false,
-        otpError: 'Failed to send OTP. Please try again.',
       }));
     }
   };
@@ -250,22 +287,34 @@ const Page = () => {
     }
 
     setOtpState((prev) => ({ ...prev, isVerifying: true, otpError: '' }));
+    setError('');
 
     try {
-      // Simulate API call to verify OTP
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const verifyData = {
+        username: ownerFormData.fullName.trim(),
+        email: ownerFormData.email.trim(),
+        phone: ownerFormData.phone.trim(),
+        otp: otpValue,
+      };
 
-      // For demo purposes, accept any 6-digit OTP
+      const response = await verifyOwnerOTP(verifyData);
+
+      // Store the created owner ID for company creation
+      if (response.owner_id) {
+        setCreatedOwnerId(response.owner_id);
+      }
+
       setOtpState((prev) => ({
         ...prev,
         isEmailVerified: true,
         isVerifying: false,
       }));
-    } catch (error) {
+    } catch (err) {
+      toast.error(`OTP verification error: ${err}`);
       setOtpState((prev) => ({
         ...prev,
         isVerifying: false,
-        otpError: 'Invalid OTP. Please try again.',
+        otpError: err.message || 'Invalid OTP. Please try again.',
       }));
     }
   };
@@ -300,6 +349,16 @@ const Page = () => {
     setOwnerErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  useEffect(() => {
+    if (createdOwnerId) {
+      localStorage.setItem('created_owner_id', createdOwnerId);
+    }
+  }, [createdOwnerId]);
+
+  useEffect(() => {
+    localStorage.setItem('active_step', activeStep);
+  }, [activeStep]);
 
   const validateCompanyForm = () => {
     const newErrors = {};
@@ -362,25 +421,23 @@ const Page = () => {
     }
 
     setIsSubmitting(true);
+    setError('');
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Split fullName into firstName and lastName for storage
-      const nameParts = ownerFormData.fullName.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-
       if (isEdit) {
-        // Update existing owner
+        // --- UPDATE FLOW ---
         const existingOwners = JSON.parse(localStorage.getItem('owners') || '[]');
+        const nameParts = ownerFormData.fullName.trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
         const updatedOwners = existingOwners.map((owner) => {
           if (owner.id === editId) {
             return {
               ...owner,
               firstName: firstName,
               lastName: lastName,
+              name: ownerFormData.fullName,
               email: ownerFormData.email,
               phone: ownerFormData.phone,
               company: companyFormData.companyName,
@@ -391,33 +448,39 @@ const Page = () => {
         });
 
         localStorage.setItem('owners', JSON.stringify(updatedOwners));
-
-        // Clean up edit data
         localStorage.removeItem('edit_owner_data');
+
+        toast.success('Owner updated successfully');
       } else {
-        // Create new owner - save as completed onboarding
-        const onboardingData = {
-          owner: {
-            firstName: firstName,
-            lastName: lastName,
-            email: ownerFormData.email,
-            phone: ownerFormData.phone,
-          },
-          company: companyFormData,
-          createdAt: new Date().toISOString(),
+        // --- CREATE FLOW ---
+        const ownerId = createdOwnerId || localStorage.getItem('created_owner_id');
+        if (!ownerId) {
+          throw new Error('Owner ID not found. Please try the process again.');
+        }
+
+        // Save createdOwnerId to localStorage for persistence
+        localStorage.setItem('created_owner_id', ownerId);
+
+        const companyData = {
+          name: companyFormData.companyName,
+          owner_id: ownerId,
+          website: companyFormData.companyURL,
+          email: companyFormData.companyEmail,
+          office_address: companyFormData.companyAddress,
+          employee_count: companyFormData.employeeCount,
+          industry_type: companyFormData.industryType,
         };
 
-        localStorage.setItem('completed_onboarding', JSON.stringify(onboardingData));
+        await createCompany(companyData);
+
+        toast.success('Owner created successfully');
       }
-
-      // Clean up temporary data
-      localStorage.removeItem('onboarding_owners');
-      localStorage.removeItem('onboarding_companies');
-
-      // Redirect to owners list
+      localStorage.removeItem('active_step');
+      // Redirect to owners list after toast
       router.push('/dashboard/owners');
-    } catch (error) {
-      console.error('Error saving owner data:', error);
+    } catch (err) {
+      toast.error(`Error saving data: ${err.message || err}`);
+      setError(err.message || 'Failed to save data. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -435,6 +498,11 @@ const Page = () => {
         ...prev,
         [field]: '',
       }));
+    }
+
+    // Clear general error
+    if (error) {
+      setError('');
     }
   };
 
@@ -459,6 +527,7 @@ const Page = () => {
             error={Boolean(ownerErrors.fullName)}
             helperText={ownerErrors.fullName}
             required
+            disabled={isEdit}
           />
 
           {/* Mobile Number */}
@@ -470,6 +539,7 @@ const Page = () => {
             error={Boolean(ownerErrors.phone)}
             helperText={ownerErrors.phone}
             required
+            disabled={isEdit}
           />
 
           {/* Email with Send OTP Button */}
@@ -483,7 +553,7 @@ const Page = () => {
               error={Boolean(ownerErrors.email)}
               helperText={ownerErrors.email}
               required
-              disabled={!isEdit && otpState.isEmailVerified}
+              disabled={(!isEdit && otpState.isEmailVerified) || isEdit}
               sx={{
                 '& .MuiInputBase-root': {
                   paddingRight: !isEdit ? '120px' : 'inherit',
@@ -762,6 +832,13 @@ const Page = () => {
           <Typography color="text.primary">{isEdit ? 'Edit' : 'Create'}</Typography>
         </Breadcrumbs>
       </Box>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
 
       {/* Stepper */}
       <Stepper activeStep={activeStep} sx={{ mb: 4 }}>

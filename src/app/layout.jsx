@@ -12,6 +12,7 @@ import { detectSettings } from 'src/components/settings/server';
 import { SettingsDrawer, defaultSettings, SettingsProvider } from 'src/components/settings';
 
 import { AuthProvider } from 'src/auth/context/jwt';
+import { Toaster } from 'react-hot-toast';
 
 // ----------------------------------------------------------------------
 
@@ -73,6 +74,7 @@ export default async function RootLayout({ children }) {
                 <MotionLazy>
                   <ProgressBar />
                   <SettingsDrawer defaultSettings={defaultSettings} />
+                  <Toaster position="top-right" reverseOrder={false} />
                   {children}
                 </MotionLazy>
               </ThemeProvider>

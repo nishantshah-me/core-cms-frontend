@@ -25,6 +25,8 @@ import {
   Checkbox,
   TableContainer,
   MenuList,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -32,48 +34,11 @@ import {
   Delete as DeleteIcon,
   MoreVert as MoreVertIcon,
 } from '@mui/icons-material';
+import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { CustomPopover } from 'src/components/custom-popover';
-
-// Initial mock data for owners - this will be managed in localStorage for CRUD
-const initialOwners = [
-  {
-    id: 1,
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@company.com',
-    phone: '+1 234 567 8900',
-    company: 'Tech Solutions Inc',
-    companyId: 1,
-  },
-  {
-    id: 2,
-    firstName: 'Jane',
-    lastName: 'Smith',
-    email: 'jane.smith@startup.com',
-    phone: '+1 234 567 8901',
-    company: 'Innovation Labs',
-    companyId: 2,
-  },
-  {
-    id: 3,
-    firstName: 'Mike',
-    lastName: 'Johnson',
-    email: 'mike.j@enterprise.com',
-    phone: '+1 234 567 8902',
-    company: 'Enterprise Corp',
-    companyId: 3,
-  },
-  {
-    id: 4,
-    firstName: 'Sarah',
-    lastName: 'Wilson',
-    email: 'sarah.wilson@agency.com',
-    phone: '+1 234 567 8903',
-    company: 'Creative Agency',
-    companyId: 4,
-  },
-];
+import { getOwnersWithCompanies, deleteOwner } from 'src/auth/services/ownerCompanyService';
+import { LogoLoader } from 'src/components/loading-screen/LogoLoader';
 
 const Page = () => {
   const router = useRouter();
@@ -83,66 +48,36 @@ const Page = () => {
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Load owners from localStorage and merge with completed onboarding
+  // Load owners from API
   useEffect(() => {
-    const loadData = () => {
-      let loadedOwners = [];
-
-      // First, load existing owners data
-      const savedOwners = localStorage.getItem('owners');
-      if (savedOwners) {
-        loadedOwners = JSON.parse(savedOwners);
-      } else {
-        // Use initial mock data if no saved data
-        loadedOwners = initialOwners;
-      }
-
-      // Check for completed onboarding data
-      const completedOnboarding = localStorage.getItem('completed_onboarding');
-      if (completedOnboarding) {
-        try {
-          const onboardingData = JSON.parse(completedOnboarding);
-
-          // Check if this onboarding data is already in the owners list
-          const existingOwner = loadedOwners.find(
-            (owner) => owner.email === onboardingData.owner.email
-          );
-
-          if (!existingOwner) {
-            // Add the new owner from completed onboarding
-            const newOwner = {
-              id: Date.now(),
-              firstName: onboardingData.owner.firstName,
-              lastName: onboardingData.owner.lastName,
-              email: onboardingData.owner.email,
-              phone: onboardingData.owner.phone,
-              company: onboardingData.company.companyName,
-              companyId: Date.now() + 1,
-              companyData: onboardingData.company, // Store complete company data
-            };
-
-            loadedOwners = [newOwner, ...loadedOwners];
-
-            // Clear the completed onboarding data as it's now integrated
-            localStorage.removeItem('completed_onboarding');
-          }
-        } catch (error) {
-          console.error('Error parsing completed onboarding data:', error);
-        }
-      }
-
-      setOwners(loadedOwners);
-      updateOwners(loadedOwners);
-    };
-
-    loadData();
+    loadOwnersData();
   }, []);
 
-  // Save to localStorage whenever owners change
-  const updateOwners = (newOwners) => {
-    setOwners(newOwners);
-    localStorage.setItem('owners', JSON.stringify(newOwners));
+  const loadOwnersData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const ownersData = await getOwnersWithCompanies();
+      setOwners(ownersData);
+    } catch (err) {
+      toast.error(`Error loading owners: ${err}`);
+      setError(err.message || 'Failed to load owners data');
+      // Fallback to localStorage if API fails (for development)
+      try {
+        const savedOwners = localStorage.getItem('owners');
+        if (savedOwners) {
+          setOwners(JSON.parse(savedOwners));
+        }
+      } catch (localStorageError) {
+        toast.error(`Failed to load from localStorage: ${localStorageError}`);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSelectAll = (checked) => {
@@ -185,7 +120,7 @@ const Page = () => {
           email: selectedOwner.email,
           phone: selectedOwner.phone,
         },
-        company: selectedOwner.companyData || {
+        company: {
           id: selectedOwner.companyId,
           companyName: selectedOwner.company,
           industryType: '',
@@ -205,67 +140,94 @@ const Page = () => {
     handleMenuClose();
   };
 
-  const handleDeleteSingle = () => {
-    if (selectedOwner) {
-      // Delete both owner and associated company data
-      const newOwners = owners.filter((owner) => owner.id !== selectedOwner.id);
-      updateOwners(newOwners);
+  const handleDeleteSingle = async () => {
+    if (!selectedOwner) return;
 
-      // Also remove from companies storage if exists
-      const savedCompanies = localStorage.getItem('onboarding_companies');
-      if (savedCompanies) {
-        try {
-          const companies = JSON.parse(savedCompanies);
-          const updatedCompanies = companies.filter(
-            (company) => company.id !== selectedOwner.companyId
-          );
-          localStorage.setItem('onboarding_companies', JSON.stringify(updatedCompanies));
-        } catch (error) {
-          console.error('Error updating companies data:', error);
-        }
+    try {
+      setIsDeleting(true);
+      setError('');
+
+      // Try to delete from API
+      try {
+        await deleteOwner(selectedOwner.id);
+      } catch (apiError) {
+        toast(`API delete failed, continuing with local removal: ${apiError}`, {
+          icon: '⚠️',
+        });
       }
+
+      // Remove from local state
+      const newOwners = owners.filter((owner) => owner.id !== selectedOwner.id);
+      setOwners(newOwners);
+
+      // Also update localStorage as backup
+      localStorage.setItem('owners', JSON.stringify(newOwners));
 
       setDeleteDialog(false);
       setSelectedOwner(null);
+    } catch (err) {
+      toast.error(`Error deleting owne: ${err}`);
+      setError(err.message || 'Failed to delete owner');
+    } finally {
+      setIsDeleting(false);
     }
     handleMenuClose();
   };
 
-  const handleBulkDelete = () => {
-    // Get the company IDs that will be deleted
-    const deletedCompanyIds = owners
-      .filter((owner) => selected.includes(owner.id))
-      .map((owner) => owner.companyId);
+  const handleBulkDelete = async () => {
+    try {
+      setIsDeleting(true);
+      setError('');
 
-    // Delete owners
-    const newOwners = owners.filter((owner) => !selected.includes(owner.id));
-    updateOwners(newOwners);
-
-    // Also remove associated companies
-    const savedCompanies = localStorage.getItem('onboarding_companies');
-    if (savedCompanies) {
-      try {
-        const companies = JSON.parse(savedCompanies);
-        const updatedCompanies = companies.filter(
-          (company) => !deletedCompanyIds.includes(company.id)
-        );
-        localStorage.setItem('onboarding_companies', JSON.stringify(updatedCompanies));
-      } catch (error) {
-        console.error('Error updating companies data:', error);
+      // Try to delete from API
+      for (const ownerId of selected) {
+        try {
+          await deleteOwner(ownerId);
+        } catch (apiError) {
+          toast(`API delete failed for owner ${ownerId}: ${apiError}`, { icon: '⚠️' });
+        }
       }
-    }
 
-    setSelected([]);
-    setBulkDeleteDialog(false);
+      // Remove from local state
+      const newOwners = owners.filter((owner) => !selected.includes(owner.id));
+      setOwners(newOwners);
+
+      // Also update localStorage as backup
+      localStorage.setItem('owners', JSON.stringify(newOwners));
+
+      setSelected([]);
+      setBulkDeleteDialog(false);
+    } catch (err) {
+      toast.error('Error deleting owners:', err);
+      setError(err.message || 'Failed to delete selected owners');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleAdd = () => {
-    // Clear any existing data when creating new
-    localStorage.removeItem('edit_owner_data');
-    localStorage.removeItem('onboarding_owners');
-    localStorage.removeItem('onboarding_companies');
     router.push('/dashboard/owners/create-owners');
   };
+
+  const handleRefresh = () => {
+    loadOwnersData();
+  };
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '80vh',
+          width: '100%',
+        }}
+      >
+        <LogoLoader />
+      </Box>
+    );
+  }
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -281,14 +243,31 @@ const Page = () => {
         </Breadcrumbs>
       </Box>
 
+      {/* Error Alert */}
+      {error && (
+        <Alert
+          severity="error"
+          sx={{ mb: 3 }}
+          action={
+            <Button color="inherit" size="small" onClick={handleRefresh}>
+              Retry
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
+      )}
+
       {/* Header with Add Button */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">Owners</Typography>
-        {owners.length > 0 && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd}>
-            Add
-          </Button>
-        )}
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {owners.length > 0 && (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd}>
+              Add
+            </Button>
+          )}
+        </Box>
       </Box>
 
       {/* Bulk Actions */}
@@ -300,6 +279,7 @@ const Page = () => {
               color="error"
               startIcon={<DeleteIcon />}
               onClick={() => setBulkDeleteDialog(true)}
+              disabled={isDeleting}
             >
               Delete Selected
             </Button>
@@ -360,7 +340,7 @@ const Page = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium">
-                        {owner.firstName} {owner.lastName}
+                        {owner.name || `${owner.firstName} ${owner.lastName}`.trim()}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -410,10 +390,9 @@ const Page = () => {
           </MenuItem>
 
           <MenuItem
-            onClick={() => {
-              setDeleteDialog(true);
-            }}
+            onClick={() => setDeleteDialog(true)}
             sx={{ color: 'error.main' }}
+            disabled={isDeleting}
           >
             <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
             Delete
@@ -431,11 +410,16 @@ const Page = () => {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialog(false)} variant="outlined">
+          <Button onClick={() => setDeleteDialog(false)} variant="outlined" disabled={isDeleting}>
             Cancel
           </Button>
-          <Button onClick={handleDeleteSingle} color="error" variant="contained">
-            Delete
+          <Button
+            onClick={handleDeleteSingle}
+            color="error"
+            variant="contained"
+            disabled={isDeleting}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -455,11 +439,20 @@ const Page = () => {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setBulkDeleteDialog(false)} variant="outlined">
+          <Button
+            onClick={() => setBulkDeleteDialog(false)}
+            variant="outlined"
+            disabled={isDeleting}
+          >
             Cancel
           </Button>
-          <Button onClick={handleBulkDelete} color="error" variant="contained">
-            Delete
+          <Button
+            onClick={handleBulkDelete}
+            color="error"
+            variant="contained"
+            disabled={isDeleting}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
