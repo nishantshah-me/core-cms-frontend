@@ -82,13 +82,15 @@ export async function createCompany(data) {
 }
 
 /**
- * Get list of company owners
+ * Get list of company owners with pagination
+ * @param {number} skip - Number of records to skip
+ * @param {number} limit - Number of records to fetch
  */
-export async function getCompanyOwners() {
+export async function getCompanyOwners(skip = 0, limit = 100) {
   try {
     const response = await apiClient({
       method: 'GET',
-      url: `${BASE_URL}${endpoints.company.get_company_owners}`,
+      url: `${BASE_URL}${endpoints.company.get_company_owners}?skip=${skip}&limit=${limit}`,
       headers: getAuthHeaders(),
     });
     return response;
@@ -98,13 +100,15 @@ export async function getCompanyOwners() {
 }
 
 /**
- * Get list of companies
+ * Get list of companies with pagination
+ * @param {number} skip - Number of records to skip
+ * @param {number} limit - Number of records to fetch
  */
-export async function getCompanyList() {
+export async function getCompanyList(skip = 0, limit = 100) {
   try {
     const response = await apiClient({
       method: 'GET',
-      url: `${BASE_URL}${endpoints.company.company_list}`,
+      url: `${BASE_URL}${endpoints.company.company_list}?skip=${skip}&limit=${limit}`,
       headers: getAuthHeaders(),
     });
     return response;
@@ -114,84 +118,185 @@ export async function getCompanyList() {
 }
 
 /**
- * Combine owners and companies data for display
- */
-export async function getOwnersWithCompanies() {
-  try {
-    const [ownersResponse, companiesResponse] = await Promise.all([
-      getCompanyOwners(),
-      getCompanyList(),
-    ]);
-
-    const owners = Array.isArray(ownersResponse) ? ownersResponse : [];
-    const companies = Array.isArray(companiesResponse) ? companiesResponse : [];
-
-    // If no owners, return empty array
-    if (owners.length === 0) {
-      return [];
-    }
-
-    // Create a map of companies for quick lookup
-    const companyMap = companies.reduce((map, company) => {
-      map[company.id] = company.name;
-      return map;
-    }, {});
-
-    // Combine owner data with company names
-    const combinedData = owners.map((owner) => ({
-      id: owner.id,
-      firstName: owner.username?.split(' ')[0] || '',
-      lastName: owner.username?.split(' ').slice(1).join(' ') || '',
-      name: owner.username || '-',
-      email: owner.email || '-',
-      phone: owner.phone || '-',
-      company: companyMap[owner.company_id] || 'Unknown Company',
-      companyId: owner.company_id,
-      // Store complete owner data for potential future use
-      ownerData: owner,
-    }));
-
-    return combinedData;
-  } catch (error) {
-    toast.error(`Error fetching owners with companies: ${error}`);
-    // Return empty array instead of throwing error for initial empty state
-    return [];
-  }
-}
-
-/**
- * Delete owner (if delete endpoint is available)
- * Note: Add delete endpoint to backend if needed
- */
-export async function deleteOwner(ownerId) {
-  try {
-    // This endpoint might need to be implemented in the backend
-    const response = await apiClient({
-      method: 'DELETE',
-      url: `${BASE_URL}/company/company-owner/${ownerId}`,
-      headers: getAuthHeaders(),
-    });
-    return response;
-  } catch (error) {
-    throw new Error('Failed to delete owner. Please try again.');
-  }
-}
-
-/**
- * Update owner (if update endpoint is available)
- * Note: Add update endpoint to backend if needed
+ * Update owner information
+ * @param {string} ownerId - Owner UUID
+ * @param {Object} data - { username, email, phone }
  */
 export async function updateOwner(ownerId, data) {
   try {
-    // This endpoint might need to be implemented in the backend
     const response = await apiClient({
-      method: 'PUT',
-      url: `${BASE_URL}/company/company-owner/${ownerId}`,
+      method: 'PATCH',
+      url: `${BASE_URL}${endpoints.company.update_company_owner}/${ownerId}`,
       data,
       headers: getAuthHeaders(),
     });
     return response;
   } catch (error) {
+    if (error?.detail) {
+      throw new Error(error.detail);
+    }
     throw new Error('Failed to update owner. Please try again.');
+  }
+}
+
+/**
+ * Delete owner
+ * @param {string} ownerId - Owner UUID
+ */
+export async function deleteOwner(ownerId) {
+  try {
+    const response = await apiClient({
+      method: 'DELETE',
+      url: `${BASE_URL}${endpoints.company.delete_company_owner}/${ownerId}`,
+      headers: getAuthHeaders(),
+    });
+    return response;
+  } catch (error) {
+    if (error?.detail) {
+      throw new Error(error.detail);
+    }
+    throw new Error('Failed to delete owner. Please try again.');
+  }
+}
+
+/**
+ * Update company information
+ * @param {number} companyId - Company ID
+ * @param {Object} data - Company data
+ */
+export async function updateCompany(companyId, data) {
+  try {
+    const response = await apiClient({
+      method: 'PATCH',
+      url: `${BASE_URL}${endpoints.company.update_company}/${companyId}`,
+      data,
+      headers: getAuthHeaders(),
+    });
+    return response;
+  } catch (error) {
+    if (error?.detail) {
+      throw new Error(error.detail);
+    }
+    throw new Error('Failed to update company. Please try again.');
+  }
+}
+
+/**
+ * Delete company
+ * @param {number} companyId - Company ID
+ */
+export async function deleteCompany(companyId) {
+  try {
+    const response = await apiClient({
+      method: 'DELETE',
+      url: `${BASE_URL}${endpoints.company.delete_company}/${companyId}`,
+      headers: getAuthHeaders(),
+    });
+    return response;
+  } catch (error) {
+    if (error?.detail) {
+      throw new Error(error.detail);
+    }
+    throw new Error('Failed to delete company. Please try again.');
+  }
+}
+
+/**
+ * Get a single owner with company data by owner ID
+ * @param {string} ownerId - Owner UUID
+ */
+export async function getOwnerById(ownerId) {
+  try {
+    // First get all owners with companies and find the specific one
+    // This is a temporary solution - ideally you'd create a specific API endpoint
+    const ownersData = await getOwnersWithCompanies(0, 1000);
+    const owner = ownersData.data.find((o) => o.id === ownerId);
+
+    if (!owner) {
+      throw new Error('Owner not found');
+    }
+
+    return owner;
+  } catch (error) {
+    console.error('Error fetching owner by ID:', error);
+    throw error;
+  }
+}
+
+/**
+ * Combine owners and companies data for display with proper pagination
+ * @param {number} skip - Number of records to skip
+ * @param {number} limit - Number of records to fetch (default 10)
+ */
+export async function getOwnersWithCompanies(skip = 0, limit = 10) {
+  try {
+    const [ownersResponse, companiesResponse] = await Promise.all([
+      getCompanyOwners(skip, limit),
+      getCompanyList(0, 1000), // Get all companies to map with owners
+    ]);
+
+    const owners = ownersResponse?.data || [];
+    const companies = companiesResponse?.data || [];
+    const totalCount = ownersResponse?.total || 0;
+
+    // If no data, return empty array with count
+    if (owners.length === 0) {
+      return {
+        data: [],
+        total: totalCount,
+      };
+    }
+
+    // Create a map of companies for quick lookup by owner_id
+    const companyMap = companies.reduce((map, company) => {
+      map[company.owner_id] = company;
+      return map;
+    }, {});
+
+    // Combine owner data with company information
+    const combinedData = owners.map((owner) => {
+      const company = companyMap[owner.id] || {};
+
+      return {
+        // Owner information
+        id: owner.id, // Owner UUID
+        firstName: owner.username?.split(' ')[0] || '',
+        lastName: owner.username?.split(' ').slice(1).join(' ') || '',
+        name: owner.username || '-',
+        email: owner.email || '-',
+        phone: owner.phone || '-',
+
+        // Company information
+        companyId: company.id || null, // Company ID (number) - can be null
+        company: company.name || 'No Company',
+        companyData: company.id
+          ? {
+              id: company.id,
+              name: company.name || '',
+              website: company.website || '',
+              email: company.email || '',
+              phone: company.phone || '',
+              office_address: company.office_address || '',
+              industry_type: company.industry_type || '',
+              employee_count: company.employee_count || '',
+            }
+          : null, // Set to null if no company exists
+
+        // Store complete owner and company data for editing
+        ownerData: owner,
+      };
+    });
+
+    return {
+      data: combinedData,
+      total: totalCount,
+    };
+  } catch (error) {
+    console.error('Error fetching owners with companies:', error);
+    // Return empty array with 0 count instead of throwing error for initial empty state
+    return {
+      data: [],
+      total: 0,
+    };
   }
 }

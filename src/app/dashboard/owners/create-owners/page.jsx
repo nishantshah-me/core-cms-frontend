@@ -24,9 +24,20 @@ import {
   Paper,
   MenuItem,
   Alert,
+  CircularProgress,
 } from '@mui/material';
-import { ArrowBack as ArrowBackIcon, Check as CheckIcon } from '@mui/icons-material';
-import { sendOwnerOTP, verifyOwnerOTP, createCompany } from 'src/auth/services/ownerCompanyService';
+import {
+  ArrowBack as ArrowBackIcon,
+  Check as CheckIcon,
+  Save as SaveIcon,
+} from '@mui/icons-material';
+import {
+  sendOwnerOTP,
+  verifyOwnerOTP,
+  createCompany,
+  updateOwner,
+  updateCompany,
+} from 'src/auth/services/ownerCompanyService';
 import toast from 'react-hot-toast';
 
 // Industry and employee count options
@@ -46,22 +57,15 @@ const steps = ['Owner Onboarding', 'Company Onboarding'];
 const Page = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeStep, setActiveStep] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return Number(localStorage.getItem('active_step')) || 0;
-    }
-    return 0;
-  });
 
+  // Safe initialization to avoid hydration errors
+  const [activeStep, setActiveStep] = useState(0);
+  const [createdOwnerId, setCreatedOwnerId] = useState(null);
   const [isEdit, setIsEdit] = useState(false);
-  const [editId, setEditId] = useState(null);
+  const [editOwnerData, setEditOwnerData] = useState(null);
+  const [hasExistingCompany, setHasExistingCompany] = useState(false); // Track if company exists
   const [error, setError] = useState('');
-  const [createdOwnerId, setCreatedOwnerId] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('created_owner_id') || null;
-    }
-    return null;
-  });
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Owner state
   const [ownerFormData, setOwnerFormData] = useState({
@@ -95,64 +99,74 @@ const Page = () => {
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Initialize data from localStorage after component mounts to avoid hydration issues
   useEffect(() => {
-    let interval;
-    if (otpState.resendTimer > 0) {
-      interval = setInterval(() => {
-        setOtpState((prev) => ({
-          ...prev,
-          resendTimer: prev.resendTimer - 1,
-        }));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [otpState.resendTimer]);
+    if (typeof window !== 'undefined') {
+      // Get active step from localStorage
+      const savedActiveStep = localStorage.getItem('active_step');
+      if (savedActiveStep) {
+        setActiveStep(Number(savedActiveStep));
+      }
 
-  // Check if edit mode and load data
+      // Get created owner ID from localStorage
+      const savedOwnerId = localStorage.getItem('created_owner_id');
+      if (savedOwnerId) {
+        setCreatedOwnerId(savedOwnerId);
+      }
+
+      setIsInitialized(true);
+    }
+  }, []);
+
+  // Handle edit mode and load data
   useEffect(() => {
+    if (!isInitialized) return;
+
     const editParam = searchParams.get('edit');
     if (editParam) {
       setIsEdit(true);
-      setEditId(Number.parseInt(editParam));
 
       // Load edit data from localStorage
       const editData = localStorage.getItem('edit_owner_data');
       if (editData) {
         try {
           const parsedEditData = JSON.parse(editData);
+          setEditOwnerData(parsedEditData);
 
-          // For edit mode, combine first and last name into fullName
-          const fullName =
-            `${parsedEditData.owner.firstName || ''} ${parsedEditData.owner.lastName || ''}`.trim();
+          // Check if company exists (has valid company ID)
+          const companyExists = parsedEditData.company && parsedEditData.company.id;
+          setHasExistingCompany(companyExists);
 
           // Populate owner form data
           setOwnerFormData({
-            fullName: fullName,
+            fullName: parsedEditData.owner.username || '',
             email: parsedEditData.owner.email || '',
             phone: parsedEditData.owner.phone || '',
           });
 
           // Populate company form data
           setCompanyFormData({
-            companyName: parsedEditData.company.companyName || '',
-            industryType: parsedEditData.company.industryType || '',
-            companyEmail: parsedEditData.company.companyEmail || parsedEditData.owner.email || '',
-            companyAddress: parsedEditData.company.companyAddress || '',
-            employeeCount: parsedEditData.company.employeeCount || '',
-            companyURL: parsedEditData.company.companyURL || '',
+            companyName: parsedEditData.company?.name || '',
+            industryType: parsedEditData.company?.industry_type || '',
+            companyEmail: parsedEditData.company?.email || '',
+            companyAddress: parsedEditData.company?.office_address || '',
+            employeeCount: parsedEditData.company?.employee_count || '',
+            companyURL: parsedEditData.company?.website || '',
           });
 
           // Skip OTP verification for edit mode
           setOtpState((prev) => ({ ...prev, isEmailVerified: true }));
         } catch (error) {
-          toast.error(`Error parsing edit data: ${error}`);
+          console.error('Error parsing edit data:', error);
+          toast.error('Error loading edit data');
           setError('Error loading edit data');
         }
       }
     } else {
       // Reset form for new creation
       setIsEdit(false);
-      setEditId(null);
+      setEditOwnerData(null);
+      setHasExistingCompany(false);
       setOwnerFormData({
         fullName: '',
         email: '',
@@ -175,10 +189,36 @@ const Page = () => {
         resendTimer: 0,
         otpError: '',
       });
-      setActiveStep(0);
-      localStorage.setItem('active_step', 0);
     }
-  }, [searchParams]);
+  }, [searchParams, isInitialized]);
+
+  // Save active step to localStorage whenever it changes
+  useEffect(() => {
+    if (isInitialized) {
+      localStorage.setItem('active_step', activeStep.toString());
+    }
+  }, [activeStep, isInitialized]);
+
+  // Save created owner ID to localStorage
+  useEffect(() => {
+    if (createdOwnerId && isInitialized) {
+      localStorage.setItem('created_owner_id', createdOwnerId);
+    }
+  }, [createdOwnerId, isInitialized]);
+
+  // OTP timer effect
+  useEffect(() => {
+    let interval;
+    if (otpState.resendTimer > 0) {
+      interval = setInterval(() => {
+        setOtpState((prev) => ({
+          ...prev,
+          resendTimer: prev.resendTimer - 1,
+        }));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [otpState.resendTimer]);
 
   const handleOwnerInputChange = (field) => (event) => {
     const value = event.target.value;
@@ -236,6 +276,9 @@ const Page = () => {
         phone: ownerFormData.phone.trim(),
       };
 
+      await sendOwnerOTP(otpData);
+      toast.success('OTP sent successfully');
+
       setOtpState((prev) => ({
         ...prev,
         otpSent: true,
@@ -244,7 +287,8 @@ const Page = () => {
         otp: ['', '', '', '', '', ''],
       }));
     } catch (err) {
-      toast.error(`OTP send error: ${err}`);
+      console.error('OTP send error:', err);
+      toast.error(`OTP send error: ${err.message}`);
       setError(err.message || 'Failed to send OTP. Please try again.');
       setOtpState((prev) => ({
         ...prev,
@@ -304,13 +348,16 @@ const Page = () => {
         setCreatedOwnerId(response.owner_id);
       }
 
+      toast.success('Email verified successfully');
+
       setOtpState((prev) => ({
         ...prev,
         isEmailVerified: true,
         isVerifying: false,
       }));
     } catch (err) {
-      toast.error(`OTP verification error: ${err}`);
+      console.error('OTP verification error:', err);
+      toast.error(`OTP verification error: ${err.message}`);
       setOtpState((prev) => ({
         ...prev,
         isVerifying: false,
@@ -349,16 +396,6 @@ const Page = () => {
     setOwnerErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
-  useEffect(() => {
-    if (createdOwnerId) {
-      localStorage.setItem('created_owner_id', createdOwnerId);
-    }
-  }, [createdOwnerId]);
-
-  useEffect(() => {
-    localStorage.setItem('active_step', activeStep);
-  }, [activeStep]);
 
   const validateCompanyForm = () => {
     const newErrors = {};
@@ -426,45 +463,60 @@ const Page = () => {
     try {
       if (isEdit) {
         // --- UPDATE FLOW ---
-        const existingOwners = JSON.parse(localStorage.getItem('owners') || '[]');
-        const nameParts = ownerFormData.fullName.trim().split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
 
-        const updatedOwners = existingOwners.map((owner) => {
-          if (owner.id === editId) {
-            return {
-              ...owner,
-              firstName: firstName,
-              lastName: lastName,
-              name: ownerFormData.fullName,
-              email: ownerFormData.email,
-              phone: ownerFormData.phone,
-              company: companyFormData.companyName,
-              companyData: companyFormData,
-            };
-          }
-          return owner;
-        });
+        // Update owner information
+        const ownerUpdateData = {
+          username: ownerFormData.fullName.trim(),
+          email: ownerFormData.email,
+          phone: ownerFormData.phone,
+        };
 
-        localStorage.setItem('owners', JSON.stringify(updatedOwners));
-        localStorage.removeItem('edit_owner_data');
+        await updateOwner(editOwnerData.owner.id, ownerUpdateData);
+        toast.success('Owner information updated successfully');
 
-        toast.success('Owner updated successfully');
+        // Handle company creation or update based on whether company exists
+        if (hasExistingCompany && editOwnerData.company.id) {
+          // Company exists - UPDATE it
+          const companyUpdateData = {
+            name: companyFormData.companyName,
+            website: companyFormData.companyURL,
+            phone: ownerFormData.phone, // Use owner phone as company phone
+            email: companyFormData.companyEmail,
+            office_address: companyFormData.companyAddress,
+            employee_count: companyFormData.employeeCount,
+            industry_type: companyFormData.industryType,
+          };
+
+          await updateCompany(editOwnerData.company.id, companyUpdateData);
+          toast.success('Company information updated successfully');
+        } else {
+          // No company exists - CREATE it
+          const companyData = {
+            owner_id: editOwnerData.owner.id,
+            name: companyFormData.companyName,
+            website: companyFormData.companyURL,
+            phone: ownerFormData.phone,
+            email: companyFormData.companyEmail,
+            office_address: companyFormData.companyAddress,
+            employee_count: companyFormData.employeeCount,
+            industry_type: companyFormData.industryType,
+          };
+
+          await createCompany(companyData);
+          toast.success('Company created successfully');
+        }
       } else {
         // --- CREATE FLOW ---
-        const ownerId = createdOwnerId || localStorage.getItem('created_owner_id');
+        const ownerId = createdOwnerId;
         if (!ownerId) {
           throw new Error('Owner ID not found. Please try the process again.');
         }
 
-        // Save createdOwnerId to localStorage for persistence
-        localStorage.setItem('created_owner_id', ownerId);
-
         const companyData = {
-          name: companyFormData.companyName,
           owner_id: ownerId,
+          name: companyFormData.companyName,
           website: companyFormData.companyURL,
+          phone: ownerFormData.phone, // Use owner phone as company phone
           email: companyFormData.companyEmail,
           office_address: companyFormData.companyAddress,
           employee_count: companyFormData.employeeCount,
@@ -472,13 +524,18 @@ const Page = () => {
         };
 
         await createCompany(companyData);
-
-        toast.success('Owner created successfully');
+        toast.success('Owner and company created successfully');
       }
+
+      // Clear localStorage items
       localStorage.removeItem('active_step');
-      // Redirect to owners list after toast
+      localStorage.removeItem('created_owner_id');
+      localStorage.removeItem('edit_owner_data');
+
+      // Redirect to owners list
       router.push('/dashboard/owners');
     } catch (err) {
+      console.error('Error saving data:', err);
       toast.error(`Error saving data: ${err.message || err}`);
       setError(err.message || 'Failed to save data. Please try again.');
     } finally {
@@ -506,6 +563,21 @@ const Page = () => {
     }
   };
 
+  // Check if Continue button should be enabled
+  const isContinueDisabled = () => {
+    if (activeStep === 0) {
+      // For owner step, check if email is verified (unless in edit mode)
+      if (!isEdit && !otpState.isEmailVerified) {
+        return true;
+      }
+      // Also check if basic required fields are filled
+      return (
+        !ownerFormData.fullName.trim() || !ownerFormData.email.trim() || !ownerFormData.phone.trim()
+      );
+    }
+    return false;
+  };
+
   const renderOwnerStep = () => (
     <Box>
       <Card sx={{ p: 3 }}>
@@ -527,7 +599,6 @@ const Page = () => {
             error={Boolean(ownerErrors.fullName)}
             helperText={ownerErrors.fullName}
             required
-            disabled={isEdit}
           />
 
           {/* Mobile Number */}
@@ -539,7 +610,6 @@ const Page = () => {
             error={Boolean(ownerErrors.phone)}
             helperText={ownerErrors.phone}
             required
-            disabled={isEdit}
           />
 
           {/* Email with Send OTP Button */}
@@ -553,7 +623,7 @@ const Page = () => {
               error={Boolean(ownerErrors.email)}
               helperText={ownerErrors.email}
               required
-              disabled={(!isEdit && otpState.isEmailVerified) || isEdit}
+              disabled={!isEdit && otpState.isEmailVerified}
               sx={{
                 '& .MuiInputBase-root': {
                   paddingRight: !isEdit ? '120px' : 'inherit',
@@ -579,7 +649,6 @@ const Page = () => {
                     sx={{ fontWeight: 'medium' }}
                   />
                 ) : !otpState.otpSent ? (
-                  // Only show Send OTP button when OTP hasn't been sent yet
                   <Button
                     size="small"
                     onClick={handleSendOTP}
@@ -594,14 +663,21 @@ const Page = () => {
                       borderRadius: '6px',
                     }}
                   >
-                    {otpState.isSending ? 'Sending...' : 'Send OTP'}
+                    {otpState.isSending ? (
+                      <>
+                        <CircularProgress size={14} sx={{ mr: 0.5 }} />
+                        Sending...
+                      </>
+                    ) : (
+                      'Send OTP'
+                    )}
                   </Button>
                 ) : null}
               </Box>
             )}
           </Box>
 
-          {/* Verified OTP - Only show after OTP is sent */}
+          {/* OTP Verification Section - Only show after OTP is sent and not in edit mode */}
           {!isEdit && otpState.otpSent && !otpState.isEmailVerified && (
             <Box sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }}>
               <Paper
@@ -683,6 +759,7 @@ const Page = () => {
                       textTransform: 'none',
                       borderRadius: '8px',
                     }}
+                    startIcon={otpState.isVerifying ? <CircularProgress size={16} /> : null}
                   >
                     {otpState.isVerifying ? 'Verifying...' : 'Verify Code'}
                   </Button>
@@ -707,6 +784,17 @@ const Page = () => {
               </Paper>
             </Box>
           )}
+
+          {/* Show edit mode indicator */}
+          {isEdit && (
+            <Box sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }}>
+              <Alert severity="info" sx={{ mt: 2 }}>
+                You are editing existing owner information.
+                {!hasExistingCompany && ' No company found - a new company will be created.'}
+                {hasExistingCompany && ' Existing company information will be updated.'}
+              </Alert>
+            </Box>
+          )}
         </Box>
       </Card>
     </Box>
@@ -717,6 +805,16 @@ const Page = () => {
       <Card sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 3 }}>
           Company Information
+          {isEdit && !hasExistingCompany && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Creating new company for this owner
+            </Typography>
+          )}
+          {isEdit && hasExistingCompany && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Updating existing company information
+            </Typography>
+          )}
         </Typography>
         <Box
           sx={{
@@ -770,6 +868,7 @@ const Page = () => {
             helperText={companyErrors.companyAddress}
             required
             multiline
+            rows={2}
           />
           <FormControl fullWidth error={Boolean(companyErrors.employeeCount)} required>
             <InputLabel>Employee Count</InputLabel>
@@ -803,20 +902,22 @@ const Page = () => {
     </Box>
   );
 
-  // Check if Continue button should be enabled
-  const isContinueDisabled = () => {
-    if (activeStep === 0) {
-      // For owner step, check if email is verified (unless in edit mode)
-      if (!isEdit && !otpState.isEmailVerified) {
-        return true;
-      }
-      // Also check if basic required fields are filled
-      return (
-        !ownerFormData.fullName.trim() || !ownerFormData.email.trim() || !ownerFormData.phone.trim()
-      );
-    }
-    return false;
-  };
+  // Don't render until initialized to avoid hydration errors
+  if (!isInitialized) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '80vh',
+          width: '100%',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -870,15 +971,21 @@ const Page = () => {
           <Button
             onClick={handleFinalSubmit}
             disabled={isSubmitting}
-            endIcon={<CheckIcon />}
+            endIcon={
+              isSubmitting ? <CircularProgress size={16} /> : isEdit ? <SaveIcon /> : <CheckIcon />
+            }
             variant="contained"
           >
             {isSubmitting
               ? isEdit
-                ? 'Updating...'
+                ? hasExistingCompany
+                  ? 'Updating...'
+                  : 'Creating Company...'
                 : 'Creating Account...'
               : isEdit
-                ? 'Update Account'
+                ? hasExistingCompany
+                  ? 'Update Account'
+                  : 'Create Company & Update Owner'
                 : 'Create Account'}
           </Button>
         ) : (
