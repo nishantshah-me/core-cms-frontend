@@ -54,9 +54,57 @@ const _workspaces_Officeous = [
         icon: ICONS.blog,
         // info: <Label>v{CONFIG.appVersion}</Label>,
       },
-      { title: 'Jobs', path: paths.dashboard.two, icon: ICONS.ecommerce },
+      // { title: 'Jobs', path: paths.dashboard.two, icon: ICONS.ecommerce },
       { title: 'Anayltics', path: paths.dashboard.three, icon: ICONS.analytics },
       { title: 'Owners', path: paths.dashboard.owners, icon: ICONS.user },
+      {
+        title: 'Jobs',
+        icon: ICONS.job,
+        children: [
+          {
+            title: 'Recruiter',
+            path: '/dashboard/jobs/recruiters',
+            // children: [
+            //   { title: 'Level 2a', path: '#/dashboard/menu-level/1a/2a' },
+            //   {
+            //     title: 'Level 2b',
+            //     path: '#/dashboard/menu-level/1a/2b',
+            //     children: [
+            //       {
+            //         title: 'Level 3a',
+            //         path: '#/dashboard/menu-level/1a/2b/3a',
+            //       },
+            //       {
+            //         title: 'Level 3b',
+            //         path: '#/dashboard/menu-level/1a/2b/3b',
+            //       },
+            //     ],
+            //   },
+            // ],
+          },
+          {
+            title: 'Candidate',
+            path: '/dashboard/jobs/candidates',
+            // children: [
+            //   { title: 'Level 2a', path: '#/dashboard/menu-level/1a/2a' },
+            //   {
+            //     title: 'Level 2b',
+            //     path: '#/dashboard/menu-level/1a/2b',
+            //     children: [
+            //       {
+            //         title: 'Level 3a',
+            //         path: '#/dashboard/menu-level/1a/2b/3a',
+            //       },
+            //       {
+            //         title: 'Level 3b',
+            //         path: '#/dashboard/menu-level/1a/2b/3b',
+            //       },
+            //     ],
+            //   },
+            // ],
+          },
+        ],
+      },
       // { title: 'Owners Test', path: paths.dashboard.owners_Test, icon: ICONS.user },
       // { title: 'Company', path: paths.dashboard.company, icon: ICONS.course },
       // { title: 'Onboarding', path: paths.dashboard.onboarding, icon: ICONS.course },

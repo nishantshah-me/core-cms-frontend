@@ -1,4 +1,3 @@
-import toast from 'react-hot-toast';
 import { apiClient } from 'src/api/apiClient';
 import { endpoints } from 'src/api/endpoints';
 
@@ -16,7 +15,7 @@ const getAuthHeaders = () => {
 };
 
 /**
- * Send OTP to email for owner verification
+ * Send OTP to both email and phone for owner verification
  * @param {Object} data - { username, email, phone }
  */
 export async function sendOwnerOTP(data) {
@@ -40,8 +39,8 @@ export async function sendOwnerOTP(data) {
 }
 
 /**
- * Verify OTP and create owner
- * @param {Object} data - { username, email, phone, otp }
+ * Verify OTP and create/update owner
+ * @param {Object} data - { username, email, phone, email_otp, phone_otp, owner_id? }
  */
 export async function verifyOwnerOTP(data) {
   try {
@@ -57,6 +56,27 @@ export async function verifyOwnerOTP(data) {
       throw new Error(error.detail);
     }
     throw new Error('OTP verification failed. Please try again.');
+  }
+}
+
+/**
+ * Update owner (username only - no OTP required)
+ * @param {Object} data - { owner_id, username }
+ */
+export async function updateOwnerUsernameOnly(data) {
+  try {
+    const response = await apiClient({
+      method: 'POST',
+      url: `${BASE_URL}${endpoints.company.verify_otp}`,
+      data,
+      headers: getAuthHeaders(),
+    });
+    return response;
+  } catch (error) {
+    if (error?.detail) {
+      throw new Error(error.detail);
+    }
+    throw new Error('Failed to update owner. Please try again.');
   }
 }
 
@@ -114,28 +134,6 @@ export async function getCompanyList(skip = 0, limit = 100) {
     return response;
   } catch (error) {
     throw new Error('Failed to fetch companies. Please try again.');
-  }
-}
-
-/**
- * Update owner information
- * @param {string} ownerId - Owner UUID
- * @param {Object} data - { username, email, phone }
- */
-export async function updateOwner(ownerId, data) {
-  try {
-    const response = await apiClient({
-      method: 'PATCH',
-      url: `${BASE_URL}${endpoints.company.update_company_owner}/${ownerId}`,
-      data,
-      headers: getAuthHeaders(),
-    });
-    return response;
-  } catch (error) {
-    if (error?.detail) {
-      throw new Error(error.detail);
-    }
-    throw new Error('Failed to update owner. Please try again.');
   }
 }
 

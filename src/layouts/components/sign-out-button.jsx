@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback } from 'react';
+
 import Button from '@mui/material/Button';
-import { useRouter } from 'src/routes/hooks';
+
 import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
 
 // ----------------------------------------------------------------------
 

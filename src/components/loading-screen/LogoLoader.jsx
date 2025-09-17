@@ -1,6 +1,7 @@
 'use client';
 
 import { styled } from '@mui/material/styles';
+
 import { AnimateLogoZoom } from '../animate';
 
 // ----------------------------------------------------------------------

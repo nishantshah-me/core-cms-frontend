@@ -22,12 +22,11 @@ import {
   Container,
   Breadcrumbs,
   Link,
-  Checkbox,
+  // Checkbox,
   TableContainer,
   MenuList,
   Alert,
   CircularProgress,
-  TablePagination,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -96,19 +95,19 @@ const Page = () => {
     }
   };
 
-  const handleSelectAll = (checked) => {
-    if (checked) {
-      setSelected(owners.map((owner) => owner.id));
-    } else {
-      setSelected([]);
-    }
-  };
+  // const handleSelectAll = (checked) => {
+  //   if (checked) {
+  //     setSelected(owners.map((owner) => owner.id));
+  //   } else {
+  //     setSelected([]);
+  //   }
+  // };
 
-  const handleSelectOne = (ownerId) => {
-    setSelected((prev) =>
-      prev.includes(ownerId) ? prev.filter((id) => id !== ownerId) : [...prev, ownerId]
-    );
-  };
+  // const handleSelectOne = (ownerId) => {
+  //   setSelected((prev) =>
+  //     prev.includes(ownerId) ? prev.filter((id) => id !== ownerId) : [...prev, ownerId]
+  //   );
+  // };
 
   const handleMenuOpen = (event, owner) => {
     event.stopPropagation(); // Prevent row click when opening menu
@@ -150,8 +149,8 @@ const Page = () => {
       router.push('/dashboard/owner-detail/');
 
       console.log('Owner details saved to localStorage:', detailsData);
-    } catch (error) {
-      console.error('Error saving owner details:', error);
+    } catch (error_) {
+      console.error('Error saving owner details:', error_);
       toast.error('Failed to load owner details');
     }
   };
@@ -314,18 +313,18 @@ const Page = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell padding="checkbox">
+                {/* <TableCell padding="checkbox">
                   <Checkbox
                     checked={selected.length === owners.length && owners.length > 0}
                     indeterminate={selected.length > 0 && selected.length < owners.length}
                     onChange={(e) => handleSelectAll(e.target.checked)}
                   />
-                </TableCell>
+                </TableCell> */}
                 <TableCell>Name</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Phone</TableCell>
                 <TableCell>Company</TableCell>
-                <TableCell width={88} />
+                <TableCell width={88}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -370,12 +369,12 @@ const Page = () => {
                       },
                     }}
                   >
-                    <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                    {/* <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selected.includes(owner.id)}
                         onChange={() => handleSelectOne(owner.id)}
                       />
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium">
                         {owner.name}

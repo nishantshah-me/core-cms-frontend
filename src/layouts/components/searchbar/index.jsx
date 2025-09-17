@@ -141,11 +141,11 @@ export function Searchbar({ data: navItems = [], sx, ...other }) {
       }}
     >
       {dataFiltered.map((item) => {
-        const matchesTitle = match(item.title, searchQuery, { insideWords: true });
-        const partsTitle = parse(item.title, matchesTitle);
+        const matchesTitle = match(item.title || '', searchQuery, { insideWords: true });
+        const partsTitle = parse(item.title || '', matchesTitle);
 
-        const matchesPath = match(item.path, searchQuery, { insideWords: true });
-        const partsPath = parse(item.path, matchesPath);
+        const matchesPath = match(item.path || '', searchQuery, { insideWords: true });
+        const partsPath = parse(item.path || '', matchesPath);
 
         return (
           <MenuItem disableRipple key={`${item.title}${item.path}`}>
@@ -153,7 +153,7 @@ export function Searchbar({ data: navItems = [], sx, ...other }) {
               path={partsPath}
               title={partsTitle}
               href={item.path}
-              labels={item.group.split('.')}
+              labels={item.group?.split('.') || []}
               onClick={handleClose}
             />
           </MenuItem>

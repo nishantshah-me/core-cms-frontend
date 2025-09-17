@@ -1,7 +1,9 @@
 'use client';
 
+import toast from 'react-hot-toast';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+
 import {
   Box,
   Card,
@@ -30,7 +32,6 @@ import {
   Edit as EditIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
-import toast from 'react-hot-toast';
 
 const OwnerDetailPage = () => {
   const router = useRouter();
@@ -114,8 +115,8 @@ const OwnerDetailPage = () => {
 
       // Navigate to edit page
       router.push(`/dashboard/owners/create-owners?edit=${ownerData.id}`);
-    } catch (error) {
-      console.error('Error preparing edit data:', error);
+    } catch (error_) {
+      console.error('Error preparing edit data:', error_);
       toast.error('Failed to prepare edit data');
     }
   };
@@ -127,15 +128,15 @@ const OwnerDetailPage = () => {
   };
 
   // Add cleanup when component unmounts (when user navigates away)
-  useEffect(() => {
-    return () => {
-      // Only cleanup when actually unmounting/navigating away
+  useEffect(
+    () => () => {
       const currentPath = window.location.pathname;
       if (currentPath !== '/dashboard/owner-detail/') {
         localStorage.removeItem('details_page_data');
       }
-    };
-  }, []);
+    },
+    []
+  );
 
   // Generate initials for avatar
   const getInitials = (firstName, lastName) => {
@@ -572,7 +573,7 @@ const OwnerDetailPage = () => {
                 No Company Information
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                This owner hasn't completed company onboarding yet.
+                This owner hasn not completed company onboarding yet.
               </Typography>
               <Button variant="contained" onClick={handleEdit} startIcon={<EditIcon />}>
                 Add Company Information
