@@ -47,8 +47,8 @@ export function JwtSignInView() {
   const [errorMessage, setErrorMessage] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const defaultValues = {
-    username: 'nishant',
-    password: 'Nishant@123',
+    username: 'shubhammulay@gmail.com',
+    password: 'Recruiter@123',
   };
 
   const methods = useForm({

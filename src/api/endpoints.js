@@ -1,6 +1,6 @@
 export const endpoints = {
-  employee: {
-    login: '/employee/login',
+  auth: {
+    signIn: '/token?grant_type=password',
   },
   company: {
     // Owner related endpoints

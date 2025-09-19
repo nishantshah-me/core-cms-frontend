@@ -7,17 +7,15 @@ import Button from '@mui/material/Button';
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
+import { signOut } from 'src/auth/services/authService';
+
 // ----------------------------------------------------------------------
 
 export function SignOutButton({ onClose, sx, ...other }) {
   const router = useRouter();
 
   const handleLogout = useCallback(() => {
-    // Remove token from localStorage
-    localStorage.removeItem('token');
-
-    // Optional: also clear user info if stored
-    localStorage.removeItem('user');
+    signOut();
 
     onClose?.();
 

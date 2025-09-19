@@ -10,7 +10,7 @@ const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
   return {
     'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
+    'x-api-key': process.env.NEXT_PUBLIC_API_KEY,
   };
 };
 
