@@ -63,7 +63,7 @@ const _workspaces_Officeous = [
         children: [
           {
             title: 'Recruiter',
-            path: '/dashboard/jobs/recruiters',
+            path: '/dashboard/jobs/recruiters/job',
             // children: [
             //   { title: 'Level 2a', path: '#/dashboard/menu-level/1a/2a' },
             //   {
