@@ -221,7 +221,7 @@ const JobCreateEditForm = () => {
 
       // Clear localStorage and navigate back
       localStorage.removeItem('job_edit_data');
-      router.push('/dashboard/jobs/recruiters/job');
+      router.push('/dashboard/jobs/recruiters');
     } catch (error) {
       console.error('Error saving job:', error);
       setError(error.message || 'Failed to save job');
@@ -234,7 +234,7 @@ const JobCreateEditForm = () => {
   // Handle cancel
   const handleCancel = () => {
     localStorage.removeItem('job_edit_data');
-    router.push('/dashboard/jobs/recruiters/job');
+    router.push('/dashboard/jobs/recruiters');
   };
 
   return (
@@ -245,10 +245,7 @@ const JobCreateEditForm = () => {
           <Link color="inherit" href="/dashboard">
             Dashboard
           </Link>
-          <Link color="inherit" href="/dashboard/jobs">
-            Jobs
-          </Link>
-          <Link color="inherit" href="/dashboard/jobs/recruiters/job">
+          <Link color="inherit" href="/dashboard/jobs/recruiters">
             List
           </Link>
           <Typography color="text.primary">{isEdit ? 'Edit Job' : 'Create Job'}</Typography>

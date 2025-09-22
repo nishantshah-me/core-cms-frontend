@@ -137,13 +137,13 @@ const JobDetailsView = () => {
 
   const handleBack = () => {
     localStorage.removeItem('job_details_data');
-    router.push('/dashboard/jobs/recruiters/job');
+    router.push('/dashboard/jobs/recruiters');
   };
 
   const handleEdit = () => {
     if (jobData) {
       localStorage.setItem('job_edit_data', JSON.stringify(jobData));
-      router.push(`/dashboard/jobs/recruiters/job/edit?id=${jobData.id}`);
+      router.push(`/dashboard/jobs/recruiters/edit?id=${jobData.id}`);
     }
   };
 
@@ -348,7 +348,7 @@ const JobDetailsView = () => {
             <Link color="inherit" href="/dashboard">
               Dashboard
             </Link>
-            <Link color="inherit" href="/dashboard/jobs/recruiters/job">
+            <Link color="inherit" href="/dashboard/jobs/recruiters">
               List
             </Link>
             <Typography color="text.primary">Job Details</Typography>
@@ -380,10 +380,6 @@ const JobDetailsView = () => {
     </Container>
   );
 };
-
-// export const metadata = {
-//   title: `Job Details | Dashboard - ${CONFIG.appName}`,
-// };
 
 export default function JobDetailsPage() {
   return <JobDetailsView />;
