@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -12,7 +12,6 @@ import {
   TableRow,
   IconButton,
   Typography,
-  MenuItem,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -23,103 +22,91 @@ import {
   TableContainer,
   MenuList,
   Alert,
-  CircularProgress,
   Tabs,
   Tab,
   Chip,
+  MenuItem,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   MoreVert as MoreVertIcon,
-  NavigateNext as NavigateNextIcon,
-  NavigateBefore as NavigateBeforeIcon,
   Visibility as VisibilityIcon,
-  Work as WorkIcon,
-  People as PeopleIcon,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { CustomPopover } from 'src/components/custom-popover';
 import { fDate } from 'src/utils/format-time';
 import toast from 'react-hot-toast';
 import { LogoLoader } from 'src/components/loading-screen/LogoLoader';
-
-// Local storage key for jobs
-const JOBS_STORAGE_KEY = 'recruiter_jobs';
+import * as jobService from 'src/auth/services/recruiterJobService';
+import { signOut } from 'src/auth/services/authService';
 
 const JobListView = () => {
   const router = useRouter();
+  const [allJobs, setAllJobs] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [currentTab, setCurrentTab] = useState('all'); // Changed default to 'all'
+  const [currentTab, setCurrentTab] = useState('all');
 
-  // Pagination state
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  // counts
+  const [totalCount, setTotalCount] = useState(0);
+  const [publishedCount, setPublishedCount] = useState(0);
+  const [draftCount, setDraftCount] = useState(0);
 
-  // Helper function to get jobs from localStorage
-  const getJobsFromStorage = () => {
-    try {
-      const storedJobs = localStorage.getItem(JOBS_STORAGE_KEY);
-      return storedJobs ? JSON.parse(storedJobs) : [];
-    } catch (error) {
-      console.error('Error reading jobs from localStorage:', error);
-      return [];
-    }
-  };
-
-  // Helper function to save jobs to localStorage
-  const saveJobsToStorage = (jobsData) => {
-    try {
-      localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobsData));
-    } catch (error) {
-      console.error('Error saving jobs to localStorage:', error);
-    }
-  };
-
-  // Load jobs data
   useEffect(() => {
     loadJobsData();
-  }, [currentTab, page, rowsPerPage]);
+  }, []);
+
+  useEffect(() => {
+    filterJobs();
+  }, [currentTab, allJobs]);
 
   const loadJobsData = async () => {
     try {
       setLoading(true);
       setError('');
+      const res = await jobService.getJobs(); // single call without status filter
+      const jobsData = res.jobs || [];
 
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // save all jobs in state
+      setAllJobs(jobsData);
 
-      const allJobs = getJobsFromStorage();
-
-      // Filter jobs based on current tab
-      let filteredJobs = allJobs;
-      if (currentTab === 'published') {
-        filteredJobs = allJobs.filter((job) => job.is_published);
-      } else if (currentTab === 'draft') {
-        filteredJobs = allJobs.filter((job) => !job.is_published);
-      }
-      // For 'all' tab, show all jobs without filtering
-
-      setJobs(filteredJobs);
+      // counts
+      setTotalCount(jobsData.length);
+      setPublishedCount(jobsData.filter((j) => j.is_published).length);
+      setDraftCount(jobsData.filter((j) => !j.is_published).length);
     } catch (err) {
+      if (err?.code === 'UNAUTHORIZED') {
+        toast.error('Session expired. Please sign in again.');
+        signOut();
+        router.push('/auth/signin');
+        return;
+      }
       console.error('Error loading jobs:', err);
       setError(err.message || 'Failed to load jobs data');
-      setJobs([]);
+      setAllJobs([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const filterJobs = () => {
+    if (currentTab === 'all') {
+      setJobs(allJobs);
+    } else if (currentTab === 'published') {
+      setJobs(allJobs.filter((j) => j.is_published));
+    } else if (currentTab === 'draft') {
+      setJobs(allJobs.filter((j) => !j.is_published));
+    }
+  };
+
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
-    setPage(0); // Reset to first page when switching tabs
   };
 
   const handleMenuOpen = (event, job) => {
@@ -134,127 +121,30 @@ const JobListView = () => {
   };
 
   const handleRowClick = (job) => {
-    // Save job data to localStorage for details page
-    try {
-      localStorage.setItem('job_details_data', JSON.stringify(job));
-      router.push(`/dashboard/jobs/recruiters/details?id=${job.id}`);
-    } catch (error) {
-      console.error('Error saving job details:', error);
-      toast.error('Failed to load job details');
-    }
+    router.push(`/dashboard/jobs/recruiters/details?id=${job.id}`);
   };
 
   const handleAdd = () => {
-    // Clear any existing job data
-    localStorage.removeItem('job_edit_data');
-    localStorage.removeItem('job_details_data');
     router.push('/dashboard/jobs/recruiters/new');
   };
 
   const handleEdit = () => {
     if (selectedJob) {
-      try {
-        // Save job data for editing
-        localStorage.setItem('job_edit_data', JSON.stringify(selectedJob));
-        router.push(`/dashboard/jobs/recruiters/edit?id=${selectedJob.id}`);
-      } catch (error) {
-        console.error('Error saving job edit data:', error);
-        toast.error('Failed to load job for editing');
-      }
-    }
-    handleMenuClose();
-  };
-
-  const handleViewDetails = () => {
-    if (selectedJob) {
-      handleRowClick(selectedJob);
+      router.push(`/dashboard/jobs/recruiters/edit?id=${selectedJob.id}`);
     }
     handleMenuClose();
   };
 
   const handleDeleteSingle = async () => {
-    if (!selectedJob) return;
-
-    try {
-      setIsDeleting(true);
-      setError('');
-
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Get all jobs from localStorage
-      const allJobs = getJobsFromStorage();
-
-      // Remove the selected job
-      const updatedJobs = allJobs.filter((job) => job.id !== selectedJob.id);
-
-      // Save back to localStorage
-      saveJobsToStorage(updatedJobs);
-
-      // Refresh the data
-      await loadJobsData();
-
-      setDeleteDialog(false);
-      setSelectedJob(null);
-
-      toast.success('Job deleted successfully');
-    } catch (err) {
-      console.error('Error deleting job:', err);
-      setError(err.message || 'Failed to delete job');
-      toast.error('Failed to delete job');
-    } finally {
-      setIsDeleting(false);
-    }
+    setDeleteDialog(false);
+    setSelectedJob(null);
+    toast('Delete API not implemented yet', { icon: '⚠️' });
     handleMenuClose();
   };
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const getEmploymentTypeLabel = (employment) => {
-    const types = {
-      full_time: 'Full Time',
-      part_time: 'Part Time',
-      contract: 'Contract',
-      internship: 'Internship',
-    };
-    return types[employment] || employment;
-  };
-
-  const getEmploymentTypeColor = (employment) => {
-    const colors = {
-      full_time: 'success',
-      part_time: 'warning',
-      contract: 'info',
-      internship: 'primary',
-    };
-    return colors[employment] || 'default';
-  };
-
-  // Get counts for tabs and summary cards
-  const allStorageJobs = getJobsFromStorage();
-  const totalCount = allStorageJobs.length;
-  const publishedCount = allStorageJobs.filter((job) => job.is_published).length;
-  const draftCount = allStorageJobs.filter((job) => !job.is_published).length;
-  const totalApplicants = allStorageJobs.reduce((sum, job) => sum + (job.applicant_count || 0), 0);
-
-  if (loading && page === 0) {
+  if (loading) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '80vh',
-          width: '100%',
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <LogoLoader />
       </Box>
     );
@@ -262,7 +152,6 @@ const JobListView = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* Breadcrumbs */}
       <Box sx={{ mb: 4 }}>
         <Breadcrumbs>
           <Link color="inherit" href="/dashboard">
@@ -275,14 +164,12 @@ const JobListView = () => {
         </Breadcrumbs>
       </Box>
 
-      {/* Error Alert */}
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
         </Alert>
       )}
 
-      {/* Header with Add Button */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">Job Management</Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd}>
@@ -302,7 +189,6 @@ const JobListView = () => {
         </Tabs>
       </Card>
 
-      {/* Table */}
       <Card>
         <TableContainer>
           <Table>
@@ -318,13 +204,7 @@ const JobListView = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading && page > 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} sx={{ textAlign: 'center', py: 3 }}>
-                    <CircularProgress />
-                  </TableCell>
-                </TableRow>
-              ) : jobs.length === 0 ? (
+              {jobs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7}>
                     <Card sx={{ textAlign: 'center', py: 7, boxShadow: 'none' }}>
@@ -335,8 +215,8 @@ const JobListView = () => {
                         {currentTab === 'all'
                           ? 'No jobs available. Create your first job posting to get started.'
                           : currentTab === 'published'
-                            ? 'No published jobs available. Create your first job posting to attract candidates.'
-                            : 'No draft jobs available. Create a draft to save your work in progress.'}
+                            ? 'No published jobs available.'
+                            : 'No draft jobs available.'}
                       </Typography>
                       <Button
                         variant="contained"
@@ -355,12 +235,7 @@ const JobListView = () => {
                     key={job.id}
                     hover
                     onClick={() => handleRowClick(job)}
-                    sx={{
-                      cursor: 'pointer',
-                      '&:hover': {
-                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      },
-                    }}
+                    sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(0,0,0,0.04)' } }}
                   >
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium">
@@ -372,10 +247,12 @@ const JobListView = () => {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={getEmploymentTypeLabel(job.employment)}
-                        color={getEmploymentTypeColor(job.employment)}
+                        label={job.employment
+                          ?.replace('_', ' ')
+                          ?.replace(/\b\w/g, (c) => c.toUpperCase())}
                         size="small"
                         variant="soft"
+                        color="primary"
                       />
                     </TableCell>
                     <TableCell>
@@ -431,7 +308,12 @@ const JobListView = () => {
         }}
       >
         <MenuList>
-          <MenuItem onClick={handleViewDetails}>
+          <MenuItem
+            onClick={() => {
+              handleRowClick(selectedJob);
+              handleMenuClose();
+            }}
+          >
             <VisibilityIcon fontSize="small" sx={{ mr: 1 }} />
             View
           </MenuItem>
@@ -441,42 +323,34 @@ const JobListView = () => {
             Edit
           </MenuItem>
 
-          <MenuItem
-            onClick={() => setDeleteDialog(true)}
-            sx={{ color: 'error.main' }}
-            disabled={isDeleting}
-          >
+          <MenuItem sx={{ color: 'error.main' }}>
             <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
             Delete
           </MenuItem>
         </MenuList>
       </CustomPopover>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Delete Job</DialogTitle>
         <DialogContent>
           <Typography sx={{ mb: 2 }}>
-            Are you sure you want to delete <strong>{selectedJob?.title}</strong>?
+            Are you sure you want to delete <strong>{selectedJob?.title}</strong>? Delete API not
+            implemented currently.
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            This action cannot be undone. The job posting and all associated data will be
-            permanently removed.
+          <Typography variant="" color="text.secondary">
+            Delete API not implemented currently.
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialog(false)} variant="outlined" disabled={isDeleting}>
+          <Button onClose={() => setDeleteDialog(false)} variant="outlined">
             Cancel
           </Button>
-          <Button
-            onClick={handleDeleteSingle}
-            color="error"
-            variant="contained"
-            disabled={isDeleting}
-            startIcon={isDeleting ? <CircularProgress size={16} /> : <DeleteIcon />}
-          >
-            {isDeleting ? 'Deleting...' : 'Delete'}
+          <Button color="error" variant="contained">
+            Delete
           </Button>
+          {/* <Button onClick={handleDeleteSingle} color="error" variant="contained">
+            Delete
+          </Button> */}
         </DialogActions>
       </Dialog>
     </Container>

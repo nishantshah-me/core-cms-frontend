@@ -14,74 +14,16 @@ import {
   Divider,
   Tab,
   Tabs,
-  Avatar,
   Grid,
-  IconButton,
-  Alert,
   CircularProgress,
-  Paper,
+  Alert,
 } from '@mui/material';
-import {
-  ArrowBack as ArrowBackIcon,
-  Edit as EditIcon,
-  Share as ShareIcon,
-  Phone as PhoneIcon,
-  Chat as ChatIcon,
-  Email as EmailIcon,
-  Download as DownloadIcon,
-  MoreVert as MoreVertIcon,
-} from '@mui/icons-material';
+import { ArrowBack as ArrowBackIcon, Edit as EditIcon } from '@mui/icons-material';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { fDate } from 'src/utils/format-time';
-
-// Mock candidates data
-const MOCK_CANDIDATES = [
-  {
-    id: 1,
-    status: 'applied',
-    candidate: {
-      full_name: 'Akshay',
-      email: 'akshay@gmail.com',
-      phone: '9898989898',
-      years_experience: 5,
-      linkedin_url: 'https://linkedin.com/in/akshay',
-      portfolio_url: 'https://akshayportfolio.com',
-    },
-    job: {
-      title: 'Senior React Developer',
-    },
-  },
-  {
-    id: 2,
-    status: 'shortlisted',
-    candidate: {
-      full_name: 'Priya Sharma',
-      email: 'priya@example.com',
-      phone: '9876543210',
-      years_experience: 3,
-      linkedin_url: 'https://linkedin.com/in/priyasharma',
-      portfolio_url: '',
-    },
-    job: {
-      title: 'UI/UX Designer',
-    },
-  },
-  {
-    id: 3,
-    status: 'interviewed',
-    candidate: {
-      full_name: 'Ravi Kumar',
-      email: 'ravi@example.com',
-      phone: '9988776655',
-      years_experience: 7,
-      linkedin_url: '',
-      portfolio_url: 'https://ravidesign.com',
-    },
-    job: {
-      title: 'Backend Engineer',
-    },
-  },
-];
+import * as jobService from 'src/auth/services/recruiterJobService';
+import { signOut } from 'src/auth/services/authService';
+import toast from 'react-hot-toast';
 
 const JobDetailsView = () => {
   const router = useRouter();
@@ -91,6 +33,7 @@ const JobDetailsView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [jobData, setJobData] = useState(null);
+  const [applications, setApplications] = useState([]);
   const [currentTab, setCurrentTab] = useState('content');
 
   useEffect(() => {
@@ -101,87 +44,39 @@ const JobDetailsView = () => {
     try {
       setLoading(true);
       setError('');
-
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Try to get job data from localStorage first
-      const storedJobData = localStorage.getItem('job_details_data');
-      if (storedJobData) {
-        const job = JSON.parse(storedJobData);
-        setJobData({
-          ...job,
-          candidates: MOCK_CANDIDATES,
-        });
-      } else {
-        // Fallback: try to find job in stored jobs
-        const allJobs = JSON.parse(localStorage.getItem('recruiter_jobs') || '[]');
-        const job = allJobs.find((j) => j.id === jobId);
-
-        if (job) {
-          setJobData({
-            ...job,
-            candidates: MOCK_CANDIDATES,
-          });
-        } else {
-          setError('Job not found');
-        }
-      }
+      const job = await jobService.getJobById(jobId);
+      const apps = await jobService.getJobApplications({ job_id: jobId });
+      setJobData(job);
+      setApplications(apps || []);
     } catch (err) {
+      if (err?.code === 'UNAUTHORIZED') {
+        toast.error('Session expired. Please sign in again.');
+        signOut();
+        router.push('/auth/signin');
+        return;
+      }
       console.error('Error loading job details:', err);
-      setError('Failed to load job details');
+      setError(err.message || 'Failed to load job details');
     } finally {
       setLoading(false);
     }
   };
 
   const handleBack = () => {
-    localStorage.removeItem('job_details_data');
     router.push('/dashboard/jobs/recruiters');
   };
 
   const handleEdit = () => {
     if (jobData) {
-      localStorage.setItem('job_edit_data', JSON.stringify(jobData));
       router.push(`/dashboard/jobs/recruiters/edit?id=${jobData.id}`);
     }
   };
 
-  const handleTabChange = (event, newValue) => {
-    setCurrentTab(newValue);
-  };
-
-  const getEmploymentTypeLabel = (employment) => {
-    const types = {
-      full_time: 'Full Time',
-      part_time: 'Part Time',
-      contract: 'Contract',
-      internship: 'Internship',
-    };
-    return types[employment] || employment;
-  };
-
-  const getEmploymentTypeColor = (employment) => {
-    const colors = {
-      full_time: 'success',
-      part_time: 'warning',
-      contract: 'info',
-      internship: 'primary',
-    };
-    return colors[employment] || 'default';
-  };
+  const handleTabChange = (event, newValue) => setCurrentTab(newValue);
 
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '80vh',
-          width: '100%',
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <CircularProgress />
       </Box>
     );
@@ -202,14 +97,12 @@ const JobDetailsView = () => {
 
   const renderJobContent = () => (
     <Grid container spacing={3}>
-      {/* Main Content */}
       <Grid item xs={12} md={8}>
         <Card sx={{ p: 4 }}>
           <Typography variant="h4" gutterBottom>
             {jobData.title}
           </Typography>
 
-          {/* Job Description */}
           <Box sx={{ mb: 4 }}>
             <Typography variant="h6" gutterBottom>
               Job Description
@@ -219,7 +112,6 @@ const JobDetailsView = () => {
             </Typography>
           </Box>
 
-          {/* Requirements */}
           <Box sx={{ mb: 4 }}>
             <Typography variant="h6" gutterBottom>
               Requirements
@@ -229,7 +121,6 @@ const JobDetailsView = () => {
             </Typography>
           </Box>
 
-          {/* Date Posted */}
           <Box sx={{ mb: 4 }}>
             <Typography variant="body2" color="text.secondary" gutterBottom>
               Date posted
@@ -237,19 +128,18 @@ const JobDetailsView = () => {
             <Typography variant="subtitle2">{fDate(jobData.created_at)}</Typography>
           </Box>
 
-          {/* Employment Type */}
           <Box sx={{ mb: 4 }}>
             <Typography variant="body2" color="text.secondary" gutterBottom>
               Employment type
             </Typography>
             <Chip
-              label={getEmploymentTypeLabel(jobData.employment)}
-              color={getEmploymentTypeColor(jobData.employment)}
+              label={jobData.employment
+                ?.replace('_', ' ')
+                ?.replace(/\b\w/g, (c) => c.toUpperCase())}
               variant="soft"
             />
           </Box>
 
-          {/* Compensation */}
           <Box sx={{ mb: 4 }}>
             <Typography variant="body2" color="text.secondary" gutterBottom>
               Offered salary
@@ -257,19 +147,17 @@ const JobDetailsView = () => {
             <Typography variant="subtitle2">{jobData.compensation_range}</Typography>
           </Box>
 
-          {/* Status */}
           <Box sx={{ mb: 4 }}>
             <Typography variant="body2" color="text.secondary" gutterBottom>
               Status
             </Typography>
             <Chip
               label={jobData.is_published ? 'Published' : 'Draft'}
-              color={jobData.is_published ? 'success' : 'default'}
               variant="soft"
+              color={jobData.is_published ? 'success' : 'default'}
             />
           </Box>
 
-          {/* Last Updated */}
           <Box sx={{ mb: 4 }}>
             <Typography variant="body2" color="text.secondary" gutterBottom>
               Last updated
@@ -283,14 +171,18 @@ const JobDetailsView = () => {
 
   const renderCandidates = () => (
     <Stack spacing={2}>
-      {MOCK_CANDIDATES.map((application) => {
-        const candidate = application.candidate;
+      {applications.length === 0 && (
+        <Card sx={{ p: 3 }}>
+          <Typography>No applicants yet</Typography>
+        </Card>
+      )}
+      {applications.map((app) => {
+        const candidate = app.candidates;
         return (
-          <Card key={application.id} sx={{ p: 3, position: 'relative' }}>
-            {/* Candidate Name + Status */}
+          <Card key={app.id} sx={{ p: 3, position: 'relative' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="subtitle1">{candidate.full_name}</Typography>
-              <Chip label={application.status} size="small" color="info" />
+              <Chip label={app.status} size="small" />
             </Box>
 
             <Box sx={{ mt: 1 }}>
@@ -305,9 +197,9 @@ const JobDetailsView = () => {
               </Typography>
               <Typography
                 variant="caption"
-                sx={{ color: 'text.disabled', fontSize: 12, display: 'block', mt: 0.5 }}
+                sx={{ color: 'text.disabled', display: 'block', mt: 0.5 }}
               >
-                Applied for: <span style={{ fontWeight: 500 }}>{application.job.title}</span>
+                Applied for: <span style={{ fontWeight: 500 }}>{app.job_openings?.title}</span>
               </Typography>
             </Box>
 
@@ -341,7 +233,6 @@ const JobDetailsView = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Breadcrumbs>
@@ -362,7 +253,6 @@ const JobDetailsView = () => {
         </Box>
       </Box>
 
-      {/* Tabs */}
       <Card sx={{ mb: 3 }}>
         <Tabs
           value={currentTab}
@@ -370,11 +260,10 @@ const JobDetailsView = () => {
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
           <Tab label="Job content" value="content" />
-          <Tab label={`Candidates (${jobData.candidates?.length || 0})`} value="candidates" />
+          <Tab label={`Candidates (${applications.length})`} value="candidates" />
         </Tabs>
       </Card>
 
-      {/* Tab Content */}
       {currentTab === 'content' && renderJobContent()}
       {currentTab === 'candidates' && renderCandidates()}
     </Container>
