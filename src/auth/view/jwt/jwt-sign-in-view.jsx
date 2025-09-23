@@ -46,14 +46,14 @@ export function JwtSignInView() {
 
   const [errorMessage, setErrorMessage] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-  const defaultValues = {
-    username: 'shubhammulay@gmail.com',
-    password: 'Recruiter@123',
-  };
+  // const defaultValues = {
+  //   username: 'shubhammulay@gmail.com',
+  //   password: 'Recruiter@123',
+  // };
 
   const methods = useForm({
     resolver: zodResolver(SignInSchema),
-    defaultValues,
+    // defaultValues,
   });
 
   const {
@@ -143,10 +143,10 @@ export function JwtSignInView() {
         sx={{ textAlign: { xs: 'center', md: 'left' } }}
       />
 
-      <Alert severity="info" sx={{ mb: 3 }}>
+      {/* <Alert severity="info" sx={{ mb: 3 }}>
         Use <strong>{defaultValues.username}</strong> with password{' '}
         <strong>{defaultValues.password}</strong>
-      </Alert>
+      </Alert> */}
 
       {!!errorMessage && (
         <Alert severity="error" sx={{ mb: 3 }}>
