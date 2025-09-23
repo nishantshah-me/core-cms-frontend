@@ -298,7 +298,7 @@ const OwnerDetailPage = () => {
             Dashboard
           </Link>
 
-          {/* ✅ Use onClick instead of href */}
+          {/* Use onClick instead of href */}
           <Link
             component="button"
             color="inherit"
