@@ -200,98 +200,112 @@ export async function deleteCompany(companyId) {
 }
 
 /**
- * Get a single owner with company data by owner ID
- * @param {string} ownerId - Owner UUID
+ * Fetch owner by id using new endpoint and map to UI-friendly structure
+ * @param {string} ownerId
  */
 export async function getOwnerById(ownerId) {
-  try {
-    // First get all owners with companies and find the specific one
-    // This is a temporary solution - ideally you'd create a specific API endpoint
-    const ownersData = await getOwnersWithCompanies(0, 1000);
-    const owner = ownersData.data.find((o) => o.id === ownerId);
+  if (!ownerId) throw new Error('ownerId is required');
 
-    if (!owner) {
-      throw new Error('Owner not found');
+  try {
+    const response = await apiClient({
+      method: 'GET',
+      url: `${BASE_URL}${endpoints.company.get_company_owner(ownerId)}`,
+      headers: getAuthHeaders(),
+    });
+
+    // response is the raw owner object
+    const owner = response;
+    if (!owner || !owner.id) {
+      const e = new Error('Owner not found');
+      e.code = 'NOT_FOUND';
+      throw e;
     }
 
-    return owner;
-  } catch (error) {
-    console.error('Error fetching owner by ID:', error);
-    throw error;
+    // take first company (if any) as default
+    const firstCompany = Array.isArray(owner.companies) ? owner.companies[0] : null;
+
+    const formatted = {
+      id: owner.id,
+      name: owner.username || '-',
+      firstName: owner.username?.split(' ')[0] || '',
+      lastName: owner.username?.split(' ').slice(1).join(' ') || '',
+      email: owner.email || '-',
+      phone: owner.phone || '-',
+      isEmailVerified: owner.is_email_verified || false,
+      isPhoneVerified: owner.is_phone_verified || false,
+      companyCount: owner.company_count || 0,
+      totalEmployeeCount: owner.total_employee_count || 0,
+      companyId: firstCompany?.company_id ?? firstCompany?.id ?? null,
+      companyData: firstCompany
+        ? {
+            id: firstCompany.company_id ?? firstCompany.id,
+            name: firstCompany.name ?? '',
+            phone: firstCompany.phone ?? '',
+            email: firstCompany.email ?? '',
+            office_address: firstCompany.office_address ?? '',
+            website: firstCompany.website ?? firstCompany.created_at ?? '',
+            industry_type: firstCompany.industry_type ?? '',
+            employee_range: firstCompany.employee_count_range ?? '',
+            employee_count: firstCompany.employees_count ?? firstCompany.employee_count ?? 0,
+          }
+        : null,
+      ownerData: owner,
+    };
+
+    return formatted;
+  } catch (err) {
+    // bubble up (you may customize error handling)
+    console.error('getOwnerById error', err);
+    throw err;
+  }
+}
+
+export async function getCompanyById(companyId) {
+  if (!companyId) throw new Error('companyId is required');
+
+  try {
+    const response = await apiClient({
+      method: 'GET',
+      url: `${BASE_URL}${endpoints.company.get_company(companyId)}`,
+      headers: getAuthHeaders(),
+    });
+    return response;
+  } catch (err) {
+    console.error('getCompanyById error', err);
+    throw err;
   }
 }
 
 /**
- * Combine owners and companies data for display with proper pagination
+ * Fetch owners with their companies (backend now includes companies in the response)
  * @param {number} skip - Number of records to skip
- * @param {number} limit - Number of records to fetch (default 10)
+ * @param {number} limit - Number of records per page
  */
 export async function getOwnersWithCompanies(skip = 0, limit = 10) {
   try {
-    const [ownersResponse, companiesResponse] = await Promise.all([
-      getCompanyOwners(skip, limit),
-      getCompanyList(0, 1000), // Get all companies to map with owners
-    ]);
-
-    const owners = ownersResponse?.data || [];
-    const companies = companiesResponse?.data || [];
-    const totalCount = ownersResponse?.total || 0;
-
-    // If no data, return empty array with count
-    if (owners.length === 0) {
-      return {
-        data: [],
-        total: totalCount,
-      };
-    }
-
-    // Create a map of companies for quick lookup by owner_id
-    const companyMap = companies.reduce((map, company) => {
-      map[company.owner_id] = company;
-      return map;
-    }, {});
-
-    // Combine owner data with company information
-    const combinedData = owners.map((owner) => {
-      const company = companyMap[owner.id] || {};
-
-      return {
-        // Owner information
-        id: owner.id, // Owner UUID
-        firstName: owner.username?.split(' ')[0] || '',
-        lastName: owner.username?.split(' ').slice(1).join(' ') || '',
-        name: owner.username || '-',
-        email: owner.email || '-',
-        phone: owner.phone || '-',
-
-        // Company information
-        companyId: company.id || null, // Company ID (number) - can be null
-        company: company.name || 'No Company',
-        companyData: company.id
-          ? {
-              id: company.id,
-              name: company.name || '',
-              website: company.website || '',
-              email: company.email || '',
-              phone: company.phone || '',
-              office_address: company.office_address || '',
-              industry_type: company.industry_type || '',
-              employee_count: company.employee_count || '',
-            }
-          : null, // Set to null if no company exists
-
-        // Store complete owner and company data for editing
-        ownerData: owner,
-      };
+    const response = await apiClient({
+      method: 'GET',
+      url: `${BASE_URL}${endpoints.company.get_company_owners}?skip=${skip}&limit=${limit}`,
+      headers: getAuthHeaders(),
     });
 
+    const { data = [], total = 0 } = response || {};
+
+    const formattedData = data.map((owner) => ({
+      id: owner.id,
+      name: owner.username || '-',
+      email: owner.email || '-',
+      phone: owner.phone || '-',
+      companyCount: owner.company_count || 0,
+      ownerData: owner,
+    }));
+
     return {
-      data: combinedData,
-      total: totalCount,
+      data: formattedData,
+      total,
     };
   } catch (error) {
     console.error('Error fetching owners with companies:', error);
-    // Return empty array with 0 count instead of throwing error for initial empty state
     return {
       data: [],
       total: 0,

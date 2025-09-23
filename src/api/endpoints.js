@@ -1,3 +1,5 @@
+import { id } from 'zod/v4/locales/index.cjs';
+
 // src/api/endpoints.js
 export const endpoints = {
   auth: {
@@ -9,11 +11,13 @@ export const endpoints = {
     get_company_owners: '/company/company-owners',
     update_company_owner: '/company/update-company-owner',
     delete_company_owner: '/company/delete-company-owner',
+    get_company_owner: (id) => `/company/get-company-owner/${encodeURIComponent(id)}`,
 
     create_company: '/company/info',
     company_list: '/company/company-list',
     update_company: '/company/info',
     delete_company: '/company/delete-company',
+    get_company: (id) => `/company/info/${encodeURIComponent(id)}`,
   },
   jobs: {
     list: '/job_openings',

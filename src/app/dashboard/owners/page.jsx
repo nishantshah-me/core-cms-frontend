@@ -123,34 +123,15 @@ const Page = () => {
   // Handle row click to navigate to detail page
   const handleRowClick = (owner) => {
     try {
-      // Clear any existing details data
-      localStorage.removeItem('details_page_data');
+      const ownerId = owner.id;
+      const companyId = owner.ownerData?.companies?.[0]?.id || null; // first company if available
 
-      // Prepare the details data with complete owner information
-      const detailsData = {
-        id: owner.id,
-        name: owner.name,
-        firstName: owner.firstName,
-        lastName: owner.lastName,
-        email: owner.email,
-        phone: owner.phone,
-        company: owner.company,
-        companyId: owner.companyId,
-        companyData: owner.companyData,
-        ownerData: owner.ownerData,
-        // Add timestamp for debugging/tracking
-        timestamp: new Date().toISOString(),
-      };
-
-      // Store the details data in localStorage
-      localStorage.setItem('details_page_data', JSON.stringify(detailsData));
-
-      // Navigate to detail page
-      router.push('/dashboard/owner-detail/');
-
-      console.log('Owner details saved to localStorage:', detailsData);
+      // Navigate with query params
+      router.push(
+        `/dashboard/owner-detail?owner_id=${ownerId}${companyId ? `&company_id=${companyId}` : ''}`
+      );
     } catch (error_) {
-      console.error('Error saving owner details:', error_);
+      console.error('Error navigating to owner details:', error_);
       toast.error('Failed to load owner details');
     }
   };
@@ -323,7 +304,7 @@ const Page = () => {
                 <TableCell>Name</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Phone</TableCell>
-                <TableCell>Company</TableCell>
+                <TableCell>Company Count</TableCell>
                 <TableCell width={88}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -387,7 +368,7 @@ const Page = () => {
                       <Typography variant="body2">{owner.phone}</Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">{owner.company}</Typography>
+                      <Typography variant="body2">{owner.companyCount}</Typography>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <IconButton onClick={(e) => handleMenuOpen(e, owner)}>

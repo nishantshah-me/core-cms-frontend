@@ -1,8 +1,9 @@
+// src/app/dashboard/owner-detail/page.jsx
 'use client';
 
 import toast from 'react-hot-toast';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import {
   Box,
@@ -33,61 +34,78 @@ import {
   Warning as WarningIcon,
 } from '@mui/icons-material';
 
+import { getOwnerById } from 'src/auth/services/ownerCompanyService';
+
 const OwnerDetailPage = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const ownerId = searchParams?.get('owner_id');
+  const companyIdParam = searchParams?.get('company_id');
+
   const [ownerData, setOwnerData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Load owner data from localStorage
   useEffect(() => {
-    loadOwnerFromStorage();
-  }, []);
-
-  const loadOwnerFromStorage = () => {
-    try {
-      setLoading(true);
-      setError('');
-
-      // Get owner data from localStorage
-      const storedData = localStorage.getItem('details_page_data');
-
-      if (!storedData) {
-        setError('No owner data found');
-        setOwnerData(null);
+    async function load() {
+      if (!ownerId) {
+        setError('No owner specified');
+        setLoading(false);
         return;
       }
 
-      const parsedData = JSON.parse(storedData);
+      try {
+        setLoading(true);
+        setError('');
+        const fetched = await getOwnerById(ownerId);
 
-      // Validate the data structure
-      if (!parsedData || !parsedData.id) {
-        setError('Invalid owner data');
-        setOwnerData(null);
-        return;
+        // If a company_id was provided, prefer matching company in raw ownerData.companies
+        if (companyIdParam && fetched.ownerData?.companies?.length > 0) {
+          const match =
+            fetched.ownerData.companies.find(
+              (c) =>
+                String(c.company_id ?? c.id) === String(companyIdParam) ||
+                String(c.id ?? c.company_id) === String(companyIdParam)
+            ) || null;
+
+          if (match) {
+            fetched.companyId = match.company_id ?? match.id ?? fetched.companyId;
+            fetched.companyData = {
+              id: match.company_id ?? match.id,
+              name: match.name ?? '',
+              phone: match.phone ?? '',
+              email: match.email ?? '',
+              office_address: match.office_address ?? '',
+              website: match.website ?? match.created_at ?? '',
+              industry_type: match.industry_type ?? '',
+              employee_range: match.employee_count_range ?? '',
+              employee_count: match.employees_count ?? match.employee_count ?? 0,
+            };
+          }
+        }
+
+        setOwnerData(fetched);
+      } catch (err) {
+        console.error('Error fetching owner by id:', err);
+        setError(err?.message || 'Failed to load owner details');
+        toast.error('Failed to load owner details');
+      } finally {
+        setLoading(false);
       }
-
-      setOwnerData(parsedData);
-      console.log('Owner data loaded from localStorage:', parsedData);
-    } catch (err) {
-      console.error('Error loading owner data from localStorage:', err);
-      setError('Failed to load owner details');
-      setOwnerData(null);
-    } finally {
-      setLoading(false);
     }
-  };
+
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownerId, companyIdParam]);
 
   const handleEdit = () => {
     if (!ownerData) return;
 
     try {
-      // Clear any existing edit data and localStorage items
       localStorage.removeItem('edit_owner_data');
       localStorage.removeItem('active_step');
       localStorage.removeItem('created_owner_id');
 
-      // Prepare the edit data with both owner and company information
       const editData = {
         isEdit: true,
         owner: {
@@ -110,11 +128,10 @@ const OwnerDetailPage = () => {
         },
       };
 
-      // Store the edit data
       localStorage.setItem('edit_owner_data', JSON.stringify(editData));
-
-      // Navigate to edit page
-      router.push(`/dashboard/owners/create-owners?edit=${ownerData.id}`);
+      router.push(
+        `/dashboard/owners/create-owners?edit=${ownerData.id}${ownerData.companyId ? `&company_id=${ownerData.companyId}` : ''}`
+      );
     } catch (error_) {
       console.error('Error preparing edit data:', error_);
       toast.error('Failed to prepare edit data');
@@ -122,23 +139,9 @@ const OwnerDetailPage = () => {
   };
 
   const handleBackToOwners = () => {
-    // Clean up localStorage before navigating back
-    localStorage.removeItem('details_page_data');
     router.push('/dashboard/owners');
   };
 
-  // Add cleanup when component unmounts (when user navigates away)
-  useEffect(
-    () => () => {
-      const currentPath = window.location.pathname;
-      if (currentPath !== '/dashboard/owner-detail/') {
-        localStorage.removeItem('details_page_data');
-      }
-    },
-    []
-  );
-
-  // Generate initials for avatar
   const getInitials = (firstName, lastName) => {
     if (!firstName && !lastName) return 'NA';
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
@@ -147,7 +150,7 @@ const OwnerDetailPage = () => {
   const ReadOnlyInput = ({ label, value, icon: Icon, isLink = false }) => (
     <TextField
       label={label}
-      value={value || 'Not provided'}
+      value={value ?? 'Not provided'}
       variant="outlined"
       fullWidth
       InputProps={{
@@ -174,21 +177,11 @@ const OwnerDetailPage = () => {
       sx={{
         '& .MuiOutlinedInput-root': {
           backgroundColor: '#f9fafb',
-          '& fieldset': {
-            borderColor: '#e5e7eb',
-          },
-          '&:hover fieldset': {
-            borderColor: '#10b981',
-          },
-          '&.Mui-focused fieldset': {
-            borderColor: '#10b981',
-          },
+          '& fieldset': { borderColor: '#e5e7eb' },
+          '&:hover fieldset': { borderColor: '#10b981' },
+          '&.Mui-focused fieldset': { borderColor: '#10b981' },
         },
-        '& .MuiInputLabel-root': {
-          color: '#6b7280',
-          fontSize: '0.875rem',
-          fontWeight: 500,
-        },
+        '& .MuiInputLabel-root': { color: '#6b7280', fontSize: '0.875rem', fontWeight: 500 },
         '& .MuiInputBase-input': {
           color: isLink && value ? '#10b981' : '#374151',
           fontWeight: 500,
@@ -198,20 +191,16 @@ const OwnerDetailPage = () => {
       onClick={
         isLink && value
           ? () => {
-              if (label.includes('Email')) {
-                window.location.href = `mailto:${value}`;
-              } else if (label.includes('Phone')) {
-                window.location.href = `tel:${value}`;
-              } else if (label.includes('URL') || label.includes('Website')) {
+              if (label.includes('Email')) window.location.href = `mailto:${value}`;
+              else if (label.includes('Phone')) window.location.href = `tel:${value}`;
+              else if (label.includes('URL') || label.includes('Website'))
                 window.open(value.startsWith('http') ? value : `https://${value}`, '_blank');
-              }
             }
           : undefined
       }
     />
   );
 
-  // Empty state when no data
   const EmptyState = () => (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
@@ -219,7 +208,12 @@ const OwnerDetailPage = () => {
           <Link color="inherit" href="/dashboard">
             Dashboard
           </Link>
-          <Link color="inherit" href="/dashboard/owners">
+          <Link
+            component="button"
+            color="inherit"
+            onClick={handleBackToOwners}
+            sx={{ cursor: 'pointer' }}
+          >
             Owners
           </Link>
           <Typography color="text.primary">Owner Detail</Typography>
@@ -245,8 +239,8 @@ const OwnerDetailPage = () => {
           color="text.secondary"
           sx={{ mb: 4, maxWidth: 600, mx: 'auto' }}
         >
-          It seems like you navigated directly to this page without selecting an owner. Please go
-          back to the owners list and select an owner to view their details.
+          No owner specified or unable to load details. Please go back to the owners list and select
+          an owner to view their details.
         </Typography>
         <Button
           variant="contained"
@@ -261,7 +255,6 @@ const OwnerDetailPage = () => {
     </Container>
   );
 
-  // Loading state
   if (loading) {
     return (
       <Box
@@ -282,23 +275,19 @@ const OwnerDetailPage = () => {
     );
   }
 
-  // Error state or no data
   if (error || !ownerData) {
     return <EmptyState />;
   }
 
-  const hasCompanyData = ownerData.companyId && ownerData.companyData?.name;
+  const hasCompanyData = !!(ownerData.companyId && ownerData.companyData?.name);
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Breadcrumbs */}
       <Box sx={{ mb: 4 }}>
         <Breadcrumbs>
           <Link color="inherit" href="/dashboard">
             Dashboard
           </Link>
-
-          {/* Use onClick instead of href */}
           <Link
             component="button"
             color="inherit"
@@ -307,22 +296,13 @@ const OwnerDetailPage = () => {
           >
             Owners
           </Link>
-
           <Typography color="text.primary">Owner Detail</Typography>
         </Breadcrumbs>
       </Box>
 
-      {/* Header */}
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography
-            variant="h3"
-            sx={{
-              fontWeight: 700,
-              color: '#1a1a1a',
-              mb: 1,
-            }}
-          >
+          <Typography variant="h3" sx={{ fontWeight: 700, color: '#1a1a1a', mb: 1 }}>
             Owner Profile
           </Typography>
           <Typography variant="h6" color="#666" sx={{ fontWeight: 400 }}>
@@ -331,15 +311,7 @@ const OwnerDetailPage = () => {
         </Box>
       </Box>
 
-      {/* Profile Header Card */}
-      <Card
-        sx={{
-          mb: 4,
-          borderRadius: 4,
-          overflow: 'hidden',
-          backgroundColor: '#374151',
-        }}
-      >
+      <Card sx={{ mb: 4, borderRadius: 4, overflow: 'hidden', backgroundColor: '#374151' }}>
         <CardContent sx={{ p: 3 }}>
           <Box
             sx={{
@@ -380,11 +352,7 @@ const OwnerDetailPage = () => {
                 <PersonIcon sx={{ color: '#10b981', fontSize: 18 }} />
                 <Typography
                   variant="body1"
-                  sx={{
-                    color: 'rgba(255,255,255,0.9)',
-                    fontWeight: 500,
-                    fontSize: '1rem',
-                  }}
+                  sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: 500, fontSize: '1rem' }}
                 >
                   Owner
                 </Typography>
@@ -396,10 +364,7 @@ const OwnerDetailPage = () => {
                       <LocationIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 16 }} />
                       <Typography
                         variant="body2"
-                        sx={{
-                          color: 'rgba(255,255,255,0.8)',
-                          fontSize: '0.875rem',
-                        }}
+                        sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}
                       >
                         {ownerData.companyData.office_address}
                       </Typography>
@@ -410,10 +375,7 @@ const OwnerDetailPage = () => {
                       <EmailIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 16 }} />
                       <Typography
                         variant="body2"
-                        sx={{
-                          color: 'rgba(255,255,255,0.8)',
-                          fontSize: '0.875rem',
-                        }}
+                        sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}
                       >
                         {ownerData.email}
                       </Typography>
@@ -440,11 +402,7 @@ const OwnerDetailPage = () => {
                   </Typography>
                   <Typography
                     variant="body1"
-                    sx={{
-                      color: 'white',
-                      fontWeight: 600,
-                      fontSize: '0.9rem',
-                    }}
+                    sx={{ color: 'white', fontWeight: 600, fontSize: '0.9rem' }}
                   >
                     {ownerData.phone}
                   </Typography>
@@ -466,11 +424,7 @@ const OwnerDetailPage = () => {
                   </Typography>
                   <Typography
                     variant="body1"
-                    sx={{
-                      color: '#10b981',
-                      fontWeight: 700,
-                      fontSize: '1rem',
-                    }}
+                    sx={{ color: '#10b981', fontWeight: 700, fontSize: '1rem' }}
                   >
                     {ownerData.companyData.employee_count}
                   </Typography>
@@ -491,21 +445,8 @@ const OwnerDetailPage = () => {
           boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
         }}
       >
-        <Box
-          sx={{
-            p: 4,
-            backgroundColor: '#f8fafc',
-            borderBottom: '1px solid #e2e8f0',
-          }}
-        >
-          <Typography
-            variant="h5"
-            sx={{
-              fontWeight: 700,
-              color: '#1a1a1a',
-              mb: 1,
-            }}
-          >
+        <Box sx={{ p: 4, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a1a1a', mb: 1 }}>
             Personal Information
           </Typography>
           <Typography variant="body1" color="#666">
@@ -543,21 +484,8 @@ const OwnerDetailPage = () => {
           boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
         }}
       >
-        <Box
-          sx={{
-            p: 4,
-            backgroundColor: '#f8fafc',
-            borderBottom: '1px solid #e2e8f0',
-          }}
-        >
-          <Typography
-            variant="h5"
-            sx={{
-              fontWeight: 700,
-              color: '#1a1a1a',
-              mb: 1,
-            }}
-          >
+        <Box sx={{ p: 4, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a1a1a', mb: 1 }}>
             Company Information
           </Typography>
           <Typography variant="body1" color="#666">

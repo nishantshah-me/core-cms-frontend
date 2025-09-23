@@ -38,6 +38,7 @@ import {
   updateOwnerUsernameOnly,
   createCompany,
   updateCompany,
+  getOwnerById, // Add this import
 } from 'src/auth/services/ownerCompanyService';
 import toast from 'react-hot-toast';
 
@@ -67,6 +68,7 @@ const Page = () => {
   const [hasExistingCompany, setHasExistingCompany] = useState(false);
   const [error, setError] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isLoadingEditData, setIsLoadingEditData] = useState(false); // New loading state
 
   // Store original values for change detection
   const [originalOwnerData, setOriginalOwnerData] = useState({
@@ -142,6 +144,80 @@ const Page = () => {
     }
   }, []);
 
+  // Load edit data from API when in edit mode
+  const loadEditDataFromAPI = async (ownerId) => {
+    try {
+      setIsLoadingEditData(true);
+      setError('');
+
+      const ownerData = await getOwnerById(ownerId);
+
+      if (!ownerData) {
+        throw new Error('Owner not found');
+      }
+
+      setEditOwnerData(ownerData);
+
+      // Check if company exists
+      const companyExists = ownerData.companyData && ownerData.companyData.id;
+      setHasExistingCompany(companyExists);
+
+      // Populate owner form data
+      const ownerFormValues = {
+        fullName: ownerData.name || '',
+        email: ownerData.email || '',
+        phone: ownerData.phone || '',
+      };
+
+      setOwnerFormData(ownerFormValues);
+      // Store original data for change detection
+      setOriginalOwnerData(ownerFormValues);
+
+      // Populate company form data
+      if (companyExists) {
+        setCompanyFormData({
+          companyName: ownerData.companyData.name || '',
+          industryType: ownerData.companyData.industry_type || '',
+          companyEmail: ownerData.companyData.email || '',
+          companyAddress: ownerData.companyData.office_address || '',
+          employeeCount:
+            ownerData.companyData.employee_range || ownerData.companyData.employee_count || '',
+          companyURL: ownerData.companyData.website || '',
+        });
+      } else {
+        // Reset company form for owners without companies
+        setCompanyFormData({
+          companyName: '',
+          industryType: '',
+          companyEmail: ownerData.email || '', // Pre-fill with owner email
+          companyAddress: '',
+          employeeCount: '',
+          companyURL: '',
+        });
+      }
+
+      // For edit mode, initially assume verified (will change if fields are modified)
+      setOtpState((prev) => ({
+        ...prev,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+      }));
+    } catch (error_) {
+      console.error('Error loading edit data from API:', error_);
+      toast.error(`Error loading owner data: ${error_.message}`);
+      setError(error_.message || 'Failed to load owner data');
+
+      // Redirect back to list if owner not found
+      if (error_.code === 'NOT_FOUND' || error_.message.includes('not found')) {
+        setTimeout(() => {
+          router.push('/dashboard/owners');
+        }, 2000);
+      }
+    } finally {
+      setIsLoadingEditData(false);
+    }
+  };
+
   // Handle edit mode and load data
   useEffect(() => {
     if (!isInitialized) return;
@@ -149,51 +225,8 @@ const Page = () => {
     const editParam = searchParams.get('edit');
     if (editParam) {
       setIsEdit(true);
-
-      // Load edit data from localStorage
-      const editData = localStorage.getItem('edit_owner_data');
-      if (editData) {
-        try {
-          const parsedEditData = JSON.parse(editData);
-          setEditOwnerData(parsedEditData);
-
-          // Check if company exists (has valid company ID)
-          const companyExists = parsedEditData.company && parsedEditData.company.id;
-          setHasExistingCompany(companyExists);
-
-          // Populate owner form data
-          const ownerData = {
-            fullName: parsedEditData.owner.username || '',
-            email: parsedEditData.owner.email || '',
-            phone: parsedEditData.owner.phone || '',
-          };
-
-          setOwnerFormData(ownerData);
-          // Store original data for change detection
-          setOriginalOwnerData(ownerData);
-
-          // Populate company form data
-          setCompanyFormData({
-            companyName: parsedEditData.company?.name || '',
-            industryType: parsedEditData.company?.industry_type || '',
-            companyEmail: parsedEditData.company?.email || '',
-            companyAddress: parsedEditData.company?.office_address || '',
-            employeeCount: parsedEditData.company?.employee_count || '',
-            companyURL: parsedEditData.company?.website || '',
-          });
-
-          // For edit mode, initially assume no verification needed
-          setOtpState((prev) => ({
-            ...prev,
-            isEmailVerified: true,
-            isPhoneVerified: true,
-          }));
-        } catch (error_) {
-          console.error('Error parsing edit data:', error_);
-          toast.error('Error loading edit data');
-          setError('Error loading edit data');
-        }
-      }
+      // Load data from API instead of localStorage
+      loadEditDataFromAPI(editParam);
     } else {
       // Reset form for new creation
       setIsEdit(false);
@@ -353,7 +386,7 @@ const Page = () => {
 
     try {
       const otpData = {
-        owner_id: isEdit ? editOwnerData.owner.id : undefined,
+        owner_id: isEdit ? editOwnerData.id : undefined,
       };
 
       if (!isEdit || changedFields.email) {
@@ -453,7 +486,7 @@ const Page = () => {
 
     try {
       const verifyData = {
-        owner_id: isEdit ? editOwnerData.owner.id : undefined,
+        owner_id: isEdit ? editOwnerData.id : undefined,
       };
 
       if (needsEmailOTP) {
@@ -602,7 +635,7 @@ const Page = () => {
 
           if (changedFields.username && !changedFields.email && !changedFields.phone) {
             const ownerUpdateData = {
-              owner_id: editOwnerData.owner.id,
+              owner_id: editOwnerData.id,
               username: ownerFormData.fullName.trim(),
             };
 
@@ -646,17 +679,18 @@ const Page = () => {
     setError('');
 
     try {
-      const originalCompanyData = editOwnerData?.company || {};
+      const originalCompanyData = editOwnerData?.companyData || {};
       const hasCompanyChanges =
         companyFormData.companyName !== originalCompanyData.name ||
         companyFormData.industryType !== originalCompanyData.industry_type ||
         companyFormData.companyEmail !== originalCompanyData.email ||
         companyFormData.companyAddress !== originalCompanyData.office_address ||
-        companyFormData.employeeCount !== originalCompanyData.employee_count ||
+        companyFormData.employeeCount !==
+          (originalCompanyData.employee_range || originalCompanyData.employee_count) ||
         companyFormData.companyURL !== originalCompanyData.website;
 
       if (isEdit) {
-        if (hasExistingCompany && editOwnerData.company.id) {
+        if (hasExistingCompany && editOwnerData.companyData?.id) {
           if (hasCompanyChanges) {
             const companyUpdateData = {
               name: companyFormData.companyName,
@@ -668,17 +702,14 @@ const Page = () => {
               industry_type: companyFormData.industryType,
             };
 
-            await updateCompany(editOwnerData.company.id, companyUpdateData);
+            await updateCompany(editOwnerData.companyData.id, companyUpdateData);
             toast.success('Company information updated successfully');
           } else {
-            // toast('No changes detected in company information', {
-            //   duration: 2000,
-            // });
             console.log('No changes detected in company information');
           }
         } else {
           const companyData = {
-            owner_id: editOwnerData.owner.id,
+            owner_id: editOwnerData.id,
             name: companyFormData.companyName,
             website: companyFormData.companyURL,
             phone: ownerFormData.phone,
@@ -975,14 +1006,14 @@ const Page = () => {
                 '& .MuiInputBase-root': {
                   paddingRight:
                     (!isEdit && otpState.isPhoneVerified) ||
-                    (isEdit && otpState.isPhoneVerified && getChangedFields().phone)
+                    (isEdit && otpState.isPhoneVerified && !getChangedFields().phone)
                       ? '120px'
                       : 'inherit',
                 },
               }}
             />
             {((!isEdit && otpState.isPhoneVerified) ||
-              (isEdit && otpState.isPhoneVerified && getChangedFields().phone)) && (
+              (isEdit && otpState.isPhoneVerified && !getChangedFields().phone)) && (
               <Box
                 sx={{
                   position: 'absolute',
@@ -1018,14 +1049,14 @@ const Page = () => {
                 '& .MuiInputBase-root': {
                   paddingRight:
                     (!isEdit && otpState.isEmailVerified) ||
-                    (isEdit && otpState.isEmailVerified && getChangedFields().email)
+                    (isEdit && otpState.isEmailVerified && !getChangedFields().email)
                       ? '120px'
                       : 'inherit',
                 },
               }}
             />
             {((!isEdit && otpState.isEmailVerified) ||
-              (isEdit && otpState.isEmailVerified && getChangedFields().email)) && (
+              (isEdit && otpState.isEmailVerified && !getChangedFields().email)) && (
               <Box
                 sx={{
                   position: 'absolute',
@@ -1205,18 +1236,23 @@ const Page = () => {
     </Box>
   );
 
-  if (!isInitialized) {
+  // Show loading screen while initializing or loading edit data
+  if (!isInitialized || isLoadingEditData) {
     return (
       <Box
         sx={{
           display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
           height: '80vh',
           width: '100%',
         }}
       >
-        <CircularProgress />
+        <CircularProgress size={40} />
+        <Typography variant="body1" sx={{ mt: 2 }}>
+          {isLoadingEditData ? 'Loading owner data...' : 'Initializing...'}
+        </Typography>
       </Box>
     );
   }
