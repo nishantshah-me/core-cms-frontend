@@ -97,7 +97,6 @@ export function JwtSignInView() {
         <Field.Text
           name="password"
           label="Password"
-          placeholder="6+ characters"
           type={showPassword ? 'text' : 'password'} // toggle input type
           slotProps={{
             inputLabel: { shrink: true },
