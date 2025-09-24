@@ -1,6 +1,3 @@
-import { id } from 'zod/v4/locales/index.cjs';
-
-// src/api/endpoints.js
 export const endpoints = {
   auth: {
     signIn: '/token?grant_type=password',

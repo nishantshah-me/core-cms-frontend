@@ -38,7 +38,8 @@ import {
   updateOwnerUsernameOnly,
   createCompany,
   updateCompany,
-  getOwnerById, // Add this import
+  getOwnerById,
+  getCompanyById, // Add this import
 } from 'src/auth/services/ownerCompanyService';
 import toast from 'react-hot-toast';
 
@@ -65,10 +66,12 @@ const Page = () => {
   const [createdOwnerId, setCreatedOwnerId] = useState(null);
   const [isEdit, setIsEdit] = useState(false);
   const [editOwnerData, setEditOwnerData] = useState(null);
+  const [editCompanyData, setEditCompanyData] = useState(null); // Add this state
   const [hasExistingCompany, setHasExistingCompany] = useState(false);
   const [error, setError] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isLoadingEditData, setIsLoadingEditData] = useState(false); // New loading state
+  const [isLoadingEditData, setIsLoadingEditData] = useState(false);
+  const [isLoadingCompanyData, setIsLoadingCompanyData] = useState(false); // Add this state
 
   // Store original values for change detection
   const [originalOwnerData, setOriginalOwnerData] = useState({
@@ -76,6 +79,15 @@ const Page = () => {
     email: '',
     phone: '',
   });
+
+  const [originalCompanyData, setOriginalCompanyData] = useState({
+    companyName: '',
+    industryType: '',
+    companyEmail: '',
+    companyAddress: '',
+    employeeCount: '',
+    companyURL: '',
+  }); // Add this state
 
   // Owner state
   const [ownerFormData, setOwnerFormData] = useState({
@@ -122,6 +134,20 @@ const Page = () => {
       email: originalOwnerData.email !== ownerFormData.email,
       phone: originalOwnerData.phone !== ownerFormData.phone,
       username: originalOwnerData.fullName !== ownerFormData.fullName,
+    };
+  };
+
+  // Helper function to detect company field changes
+  const getChangedCompanyFields = () => {
+    if (!isEdit || !hasExistingCompany) return true; // All fields are new
+
+    return {
+      companyName: originalCompanyData.companyName !== companyFormData.companyName,
+      industryType: originalCompanyData.industryType !== companyFormData.industryType,
+      companyEmail: originalCompanyData.companyEmail !== companyFormData.companyEmail,
+      companyAddress: originalCompanyData.companyAddress !== companyFormData.companyAddress,
+      employeeCount: originalCompanyData.employeeCount !== companyFormData.employeeCount,
+      companyURL: originalCompanyData.companyURL !== companyFormData.companyURL,
     };
   };
 
@@ -173,9 +199,10 @@ const Page = () => {
       // Store original data for change detection
       setOriginalOwnerData(ownerFormValues);
 
-      // Populate company form data
+      // Initialize company form data (will be populated later when company step is accessed)
       if (companyExists) {
-        setCompanyFormData({
+        // Set initial company data from owner response as fallback
+        const initialCompanyData = {
           companyName: ownerData.companyData.name || '',
           industryType: ownerData.companyData.industry_type || '',
           companyEmail: ownerData.companyData.email || '',
@@ -183,17 +210,21 @@ const Page = () => {
           employeeCount:
             ownerData.companyData.employee_range || ownerData.companyData.employee_count || '',
           companyURL: ownerData.companyData.website || '',
-        });
+        };
+        setCompanyFormData(initialCompanyData);
+        setOriginalCompanyData(initialCompanyData);
       } else {
         // Reset company form for owners without companies
-        setCompanyFormData({
+        const newCompanyData = {
           companyName: '',
           industryType: '',
           companyEmail: ownerData.email || '', // Pre-fill with owner email
           companyAddress: '',
           employeeCount: '',
           companyURL: '',
-        });
+        };
+        setCompanyFormData(newCompanyData);
+        setOriginalCompanyData(newCompanyData);
       }
 
       // For edit mode, initially assume verified (will change if fields are modified)
@@ -218,6 +249,45 @@ const Page = () => {
     }
   };
 
+  // Load company data specifically when accessing company step in edit mode
+  const loadCompanyDataForEdit = async () => {
+    if (!isEdit || !hasExistingCompany || !editOwnerData?.companyData?.id || editCompanyData) {
+      return; // Skip if not edit mode, no company, or already loaded
+    }
+
+    try {
+      setIsLoadingCompanyData(true);
+      setError('');
+
+      const companyData = await getCompanyById(editOwnerData.companyData.id);
+
+      if (!companyData) {
+        throw new Error('Company not found');
+      }
+
+      setEditCompanyData(companyData);
+
+      // Populate company form data with fresh data from API
+      const companyFormValues = {
+        companyName: companyData.name || '',
+        industryType: companyData.industry_type || '',
+        companyEmail: companyData.email || '',
+        companyAddress: companyData.office_address || '',
+        employeeCount: companyData.employee_count_range || companyData.employee_count || '',
+        companyURL: companyData.website || '',
+      };
+
+      setCompanyFormData(companyFormValues);
+      setOriginalCompanyData(companyFormValues);
+    } catch (error_) {
+      console.error('Error loading company data from API:', error_);
+      toast.error(`Error loading company data: ${error_.message}`);
+      setError(error_.message || 'Failed to load company data');
+    } finally {
+      setIsLoadingCompanyData(false);
+    }
+  };
+
   // Handle edit mode and load data
   useEffect(() => {
     if (!isInitialized) return;
@@ -231,6 +301,7 @@ const Page = () => {
       // Reset form for new creation
       setIsEdit(false);
       setEditOwnerData(null);
+      setEditCompanyData(null);
       setHasExistingCompany(false);
       setOwnerFormData({
         fullName: '',
@@ -238,6 +309,19 @@ const Page = () => {
         phone: '',
       });
       setCompanyFormData({
+        companyName: '',
+        industryType: '',
+        companyEmail: '',
+        companyAddress: '',
+        employeeCount: '',
+        companyURL: '',
+      });
+      setOriginalOwnerData({
+        fullName: '',
+        email: '',
+        phone: '',
+      });
+      setOriginalCompanyData({
         companyName: '',
         industryType: '',
         companyEmail: '',
@@ -260,6 +344,13 @@ const Page = () => {
       });
     }
   }, [searchParams, isInitialized]);
+
+  // Load company data when stepping to company step in edit mode
+  useEffect(() => {
+    if (activeStep === 1 && isEdit && hasExistingCompany) {
+      loadCompanyDataForEdit();
+    }
+  }, [activeStep, isEdit, hasExistingCompany]);
 
   // Save active step to localStorage whenever it changes
   useEffect(() => {
@@ -679,15 +770,11 @@ const Page = () => {
     setError('');
 
     try {
-      const originalCompanyData = editOwnerData?.companyData || {};
+      const changedCompanyFields = getChangedCompanyFields();
       const hasCompanyChanges =
-        companyFormData.companyName !== originalCompanyData.name ||
-        companyFormData.industryType !== originalCompanyData.industry_type ||
-        companyFormData.companyEmail !== originalCompanyData.email ||
-        companyFormData.companyAddress !== originalCompanyData.office_address ||
-        companyFormData.employeeCount !==
-          (originalCompanyData.employee_range || originalCompanyData.employee_count) ||
-        companyFormData.companyURL !== originalCompanyData.website;
+        typeof changedCompanyFields === 'object'
+          ? Object.values(changedCompanyFields).some(Boolean)
+          : changedCompanyFields;
 
       if (isEdit) {
         if (hasExistingCompany && editOwnerData.companyData?.id) {
@@ -1137,6 +1224,14 @@ const Page = () => {
 
   const renderCompanyStep = () => (
     <Box>
+      {isLoadingCompanyData && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+          <CircularProgress size={24} />
+          <Typography variant="body2" sx={{ ml: 2 }}>
+            Loading company data...
+          </Typography>
+        </Box>
+      )}
       <Card sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 3 }}>
           Company Information
@@ -1166,6 +1261,7 @@ const Page = () => {
             error={Boolean(companyErrors.companyName)}
             helperText={companyErrors.companyName}
             required
+            disabled={isLoadingCompanyData}
           />
           <FormControl fullWidth error={Boolean(companyErrors.industryType)} required>
             <InputLabel>Industry Type</InputLabel>
@@ -1173,6 +1269,7 @@ const Page = () => {
               value={companyFormData.industryType}
               onChange={handleCompanyInputChange('industryType')}
               label="Industry Type"
+              disabled={isLoadingCompanyData}
             >
               {industryOptions.map((industry) => (
                 <MenuItem key={industry} value={industry}>
@@ -1193,6 +1290,7 @@ const Page = () => {
             error={Boolean(companyErrors.companyEmail)}
             helperText={companyErrors.companyEmail}
             required
+            disabled={isLoadingCompanyData}
           />
           <TextField
             fullWidth
@@ -1203,6 +1301,7 @@ const Page = () => {
             helperText={companyErrors.companyAddress}
             required
             multiline
+            disabled={isLoadingCompanyData}
           />
           <FormControl fullWidth error={Boolean(companyErrors.employeeCount)} required>
             <InputLabel>Employee Count</InputLabel>
@@ -1210,6 +1309,7 @@ const Page = () => {
               value={companyFormData.employeeCount}
               onChange={handleCompanyInputChange('employeeCount')}
               label="Employee Count"
+              disabled={isLoadingCompanyData}
             >
               {employeeCountOptions.map((count) => (
                 <MenuItem key={count} value={count}>
@@ -1230,6 +1330,7 @@ const Page = () => {
             helperText={companyErrors.companyURL}
             required
             placeholder="https://example.com"
+            disabled={isLoadingCompanyData}
           />
         </Box>
       </Card>
@@ -1303,7 +1404,7 @@ const Page = () => {
         {activeStep === steps.length - 1 ? (
           <Button
             onClick={handleFinalSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoadingCompanyData}
             endIcon={
               isSubmitting ? <CircularProgress size={16} /> : isEdit ? <SaveIcon /> : <CheckIcon />
             }

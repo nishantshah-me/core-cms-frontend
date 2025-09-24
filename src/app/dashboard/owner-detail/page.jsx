@@ -1,4 +1,3 @@
-// src/app/dashboard/owner-detail/page.jsx
 'use client';
 
 import toast from 'react-hot-toast';
@@ -408,7 +407,7 @@ const OwnerDetailPage = () => {
                   </Typography>
                 </Box>
               )}
-              {hasCompanyData && ownerData.companyData?.employee_count && (
+              {/* {hasCompanyData && ownerData.companyData?.employee_count && (
                 <Box>
                   <Typography
                     variant="body2"
@@ -429,7 +428,7 @@ const OwnerDetailPage = () => {
                     {ownerData.companyData.employee_count}
                   </Typography>
                 </Box>
-              )}
+              )} */}
             </Box>
           </Box>
         </CardContent>
