@@ -16,7 +16,7 @@ export default function Page() {
 
   useEffect(() => {
     // router.push(CONFIG.auth.redirectPath);
-    router.push(paths.auth.jwt.signIn);
+    router.push('/sign-in');
   }, [router]);
 
   return null;

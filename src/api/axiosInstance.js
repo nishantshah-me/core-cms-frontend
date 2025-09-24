@@ -42,7 +42,7 @@ axiosInstance.interceptors.response.use(
         // Cleanup + redirect to login
         signOut();
         if (typeof window !== 'undefined') {
-          window.location.href = '/auth/jwt/sign-in';
+          window.location.href = '/sign-in';
         }
       }
     }

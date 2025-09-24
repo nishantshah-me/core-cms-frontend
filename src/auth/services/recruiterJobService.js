@@ -5,6 +5,34 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const REST_BASE = `${SUPABASE_URL}/rest/v1`;
 
+// handle Error
+export function handleApiError(err) {
+  let errorInfo = {
+    message: 'Unexpected error occurred',
+    raw: err,
+  };
+
+  if (err.response) {
+    const data = err.response.data;
+
+    errorInfo.status = err.response.status || null;
+    errorInfo.message = data?.message || err.message;
+  } else if (err.request) {
+    // Request was made but no response
+    errorInfo.message = 'No response from server. Please check your network.';
+  } else {
+    // Something happened before request was made
+    errorInfo.message = err.message || String(err);
+  }
+
+  // Log full context for debugging
+  console.error('API Error:', {
+    message: errorInfo.message,
+  });
+
+  throw errorInfo;
+}
+
 // Build headers
 function getAuthHeaders() {
   if (typeof window === 'undefined') return {};

@@ -20,7 +20,7 @@ export function SignOutButton({ onClose, sx, ...other }) {
     onClose?.();
 
     // Redirect to login page
-    router.push(paths.auth.jwt.signIn);
+    router.push('/sign-in');
   }, [onClose, router]);
 
   return (
