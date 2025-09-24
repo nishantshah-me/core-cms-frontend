@@ -304,7 +304,7 @@ const Page = () => {
                 <TableCell>Name</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Phone</TableCell>
-                <TableCell>Company Count</TableCell>
+                <TableCell>Companies</TableCell>
                 <TableCell width={88}>Actions</TableCell>
               </TableRow>
             </TableHead>

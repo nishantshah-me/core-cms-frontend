@@ -9,15 +9,23 @@ import {
   Card,
   Typography,
   Container,
-  Avatar,
   Grid,
-  TextField,
   CardContent,
-  InputAdornment,
   Breadcrumbs,
   Link,
   CircularProgress,
   Button,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  MenuList,
+  MenuItem,
+  IconButton, // Added IconButton
 } from '@mui/material';
 import {
   Email as EmailIcon,
@@ -31,7 +39,14 @@ import {
   ArrowBack as ArrowBackIcon,
   Edit as EditIcon,
   Warning as WarningIcon,
+  AccountBalance as BillingIcon,
+  TrendingUp as RevenueIcon,
+  Groups as TeamIcon,
+  Add as AddIcon,
+  MoreVert as MoreVertIcon, // Added MoreVertIcon
 } from '@mui/icons-material';
+
+import { CustomPopover } from 'src/components/custom-popover';
 
 import { getOwnerById } from 'src/auth/services/ownerCompanyService';
 
@@ -44,6 +59,10 @@ const OwnerDetailPage = () => {
   const [ownerData, setOwnerData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // State for the company actions menu
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [selectedCompany, setSelectedCompany] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -58,32 +77,25 @@ const OwnerDetailPage = () => {
         setError('');
         const fetched = await getOwnerById(ownerId);
 
-        // If a company_id was provided, prefer matching company in raw ownerData.companies
-        if (companyIdParam && fetched.ownerData?.companies?.length > 0) {
-          const match =
-            fetched.ownerData.companies.find(
+        // Ensure companies are available as a list in ownerData
+        const companies = fetched.ownerData?.companies || [];
+
+        // If a company_id was provided, find the matching company.
+        let selectedCompanyData = null;
+        if (companyIdParam && companies.length > 0) {
+          selectedCompanyData =
+            companies.find(
               (c) =>
                 String(c.company_id ?? c.id) === String(companyIdParam) ||
                 String(c.id ?? c.company_id) === String(companyIdParam)
             ) || null;
-
-          if (match) {
-            fetched.companyId = match.company_id ?? match.id ?? fetched.companyId;
-            fetched.companyData = {
-              id: match.company_id ?? match.id,
-              name: match.name ?? '',
-              phone: match.phone ?? '',
-              email: match.email ?? '',
-              office_address: match.office_address ?? '',
-              website: match.website ?? match.created_at ?? '',
-              industry_type: match.industry_type ?? '',
-              employee_range: match.employee_count_range ?? '',
-              employee_count: match.employees_count ?? match.employee_count ?? 0,
-            };
-          }
         }
 
-        setOwnerData(fetched);
+        setOwnerData({
+          ...fetched,
+          companies: companies, // Store the full list of companies
+          companyData: selectedCompanyData, // Keep the selected company for other uses if needed
+        });
       } catch (err) {
         console.error('Error fetching owner by id:', err);
         setError(err?.message || 'Failed to load owner details');
@@ -97,8 +109,12 @@ const OwnerDetailPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownerId, companyIdParam]);
 
-  const handleEdit = () => {
-    if (!ownerData) return;
+  // Handle edit action for a specific company
+  const handleEdit = (company) => {
+    if (!ownerData || !company) return;
+
+    // Close the popover
+    handleMenuClose();
 
     try {
       localStorage.removeItem('edit_owner_data');
@@ -116,88 +132,121 @@ const OwnerDetailPage = () => {
           phone: ownerData.phone,
         },
         company: {
-          id: ownerData.companyId,
-          name: ownerData.companyData?.name || '',
-          website: ownerData.companyData?.website || '',
-          email: ownerData.companyData?.email || ownerData.email,
-          phone: ownerData.companyData?.phone || '',
-          office_address: ownerData.companyData?.office_address || '',
-          industry_type: ownerData.companyData?.industry_type || '',
-          employee_count: ownerData.companyData?.employee_count || '',
+          id: company.id,
+          name: company.name || '',
+          website: company.website || '',
+          email: company.email || ownerData.email,
+          phone: company.phone || '',
+          office_address: company.office_address || '',
+          industry_type: company.industry_type || '',
+          employee_count: company.employee_count || '',
         },
       };
 
       localStorage.setItem('edit_owner_data', JSON.stringify(editData));
-      router.push(
-        `/dashboard/owners/create-owners?edit=${ownerData.id}${ownerData.companyId ? `&company_id=${ownerData.companyId}` : ''}`
-      );
+      router.push(`/dashboard/owners/create-owners?edit=${ownerData.id}&company_id=${company.id}`);
     } catch (error_) {
       console.error('Error preparing edit data:', error_);
       toast.error('Failed to prepare edit data');
     }
   };
 
+  // Function to add a new company, without a specific company object
+  const handleAddCompany = () => {
+    if (!ownerData) return;
+    try {
+      localStorage.removeItem('edit_owner_data');
+      localStorage.removeItem('active_step');
+      localStorage.removeItem('created_owner_id');
+      const editData = {
+        isEdit: true,
+        owner: {
+          id: ownerData.id,
+          username: ownerData.name,
+          firstName: ownerData.firstName,
+          lastName: ownerData.lastName,
+          email: ownerData.email,
+          phone: ownerData.phone,
+        },
+        company: null, // No company data for adding a new one
+      };
+      localStorage.setItem('edit_owner_data', JSON.stringify(editData));
+      router.push(`/dashboard/owners/create-owners?edit=${ownerData.id}`);
+    } catch (error_) {
+      console.error('Error preparing add data:', error_);
+      toast.error('Failed to prepare add company data');
+    }
+  };
+
+  const handleMenuOpen = (event, company) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+    setSelectedCompany(company);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setSelectedCompany(null);
+  };
+
   const handleBackToOwners = () => {
     router.push('/dashboard/owners');
   };
 
-  const getInitials = (firstName, lastName) => {
-    if (!firstName && !lastName) return 'NA';
-    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
-  };
-
-  const ReadOnlyInput = ({ label, value, icon: Icon, isLink = false }) => (
-    <TextField
-      label={label}
-      value={value ?? 'Not provided'}
-      variant="outlined"
-      fullWidth
-      InputProps={{
-        readOnly: true,
-        startAdornment: (
-          <InputAdornment position="start">
-            <Box
-              sx={{
-                width: 32,
-                height: 32,
-                borderRadius: 1,
-                backgroundColor: '#10b981',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-              }}
-            >
-              <Icon sx={{ fontSize: 18 }} />
-            </Box>
-          </InputAdornment>
-        ),
-      }}
+  const StatCard = ({ icon: Icon, label, value, color = '#0369a1', sx = {} }) => (
+    <Paper
       sx={{
-        '& .MuiOutlinedInput-root': {
-          backgroundColor: '#f9fafb',
-          '& fieldset': { borderColor: '#e5e7eb' },
-          '&:hover fieldset': { borderColor: '#10b981' },
-          '&.Mui-focused fieldset': { borderColor: '#10b981' },
+        p: 3,
+        borderRadius: 3,
+        border: '1px solid #f1f5f9',
+        backgroundColor: '#fefefe',
+        transition: 'all 0.2s ease-in-out',
+        '&:hover': {
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          transform: 'translateY(-2px)',
         },
-        '& .MuiInputLabel-root': { color: '#6b7280', fontSize: '0.875rem', fontWeight: 500 },
-        '& .MuiInputBase-input': {
-          color: isLink && value ? '#10b981' : '#374151',
-          fontWeight: 500,
-          cursor: isLink && value ? 'pointer' : 'default',
-        },
+        ...sx,
       }}
-      onClick={
-        isLink && value
-          ? () => {
-              if (label.includes('Email')) window.location.href = `mailto:${value}`;
-              else if (label.includes('Phone')) window.location.href = `tel:${value}`;
-              else if (label.includes('URL') || label.includes('Website'))
-                window.open(value.startsWith('http') ? value : `https://${value}`, '_blank');
-            }
-          : undefined
-      }
-    />
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box
+          sx={{
+            width: 48,
+            height: 48,
+            borderRadius: 2.5,
+            backgroundColor: `${color}15`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: `1px solid ${color}25`,
+          }}
+        >
+          <Icon sx={{ fontSize: 24, color }} />
+        </Box>
+        <Box>
+          <Typography
+            variant="body2"
+            sx={{
+              color: '#64748b',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              mb: 0.5,
+            }}
+          >
+            {label}
+          </Typography>
+          <Typography
+            sx={{
+              color: '#1e293b',
+              fontWeight: 600,
+              fontSize: '1.2rem',
+            }}
+          >
+            {value}
+          </Typography>
+        </Box>
+      </Box>
+    </Paper>
   );
 
   const EmptyState = () => (
@@ -278,7 +327,7 @@ const OwnerDetailPage = () => {
     return <EmptyState />;
   }
 
-  const hasCompanyData = !!(ownerData.companyId && ownerData.companyData?.name);
+  const hasCompanies = !!(ownerData.companies && ownerData.companies.length > 0);
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -299,175 +348,84 @@ const OwnerDetailPage = () => {
         </Breadcrumbs>
       </Box>
 
+      {/* Header Section */}
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h3" sx={{ fontWeight: 700, color: '#1a1a1a', mb: 1 }}>
             Owner Profile
           </Typography>
           <Typography variant="h6" color="#666" sx={{ fontWeight: 400 }}>
-            Comprehensive owner information and company details
+            Owner details and company information
           </Typography>
         </Box>
       </Box>
-
-      <Card sx={{ mb: 4, borderRadius: 4, overflow: 'hidden', backgroundColor: '#374151' }}>
-        <CardContent sx={{ p: 3 }}>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: 'auto 1fr auto',
-              alignItems: 'center',
-              gap: 3,
-              width: '100%',
-            }}
-          >
-            <Avatar
-              sx={{
-                width: 70,
-                height: 70,
-                backgroundColor: '#10b981',
-                fontSize: '1.75rem',
-                fontWeight: 700,
-                border: '3px solid rgba(255,255,255,0.2)',
-                flexShrink: 0,
-              }}
-            >
-              {getInitials(ownerData.firstName, ownerData.lastName)}
-            </Avatar>
-
-            <Box sx={{ minWidth: 0 }}>
-              <Typography
-                variant="h4"
-                sx={{
-                  fontWeight: 700,
-                  color: 'white',
-                  mb: 0.5,
-                  fontSize: { xs: '1.5rem', sm: '2rem' },
-                }}
-              >
-                {ownerData.name || 'No Name'}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <PersonIcon sx={{ color: '#10b981', fontSize: 18 }} />
-                <Typography
-                  variant="body1"
-                  sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: 500, fontSize: '1rem' }}
-                >
-                  Owner
-                </Typography>
-              </Box>
-              {(ownerData.companyData?.office_address || ownerData.email) && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                  {ownerData.companyData?.office_address && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <LocationIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 16 }} />
-                      <Typography
-                        variant="body2"
-                        sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}
-                      >
-                        {ownerData.companyData.office_address}
-                      </Typography>
-                    </Box>
-                  )}
-                  {ownerData.email && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <EmailIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 16 }} />
-                      <Typography
-                        variant="body2"
-                        sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}
-                      >
-                        {ownerData.email}
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-              )}
-            </Box>
-
-            <Box sx={{ textAlign: 'right', minWidth: '120px' }}>
-              {ownerData.phone && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: 'rgba(255,255,255,0.6)',
-                      fontSize: '0.75rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: 0.5,
-                      mb: 0.5,
-                    }}
-                  >
-                    Phone
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    sx={{ color: 'white', fontWeight: 600, fontSize: '0.9rem' }}
-                  >
-                    {ownerData.phone}
-                  </Typography>
-                </Box>
-              )}
-              {/* {hasCompanyData && ownerData.companyData?.employee_count && (
-                <Box>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: 'rgba(255,255,255,0.6)',
-                      fontSize: '0.75rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: 0.5,
-                      mb: 0.5,
-                    }}
-                  >
-                    Team Size
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    sx={{ color: '#10b981', fontWeight: 700, fontSize: '1rem' }}
-                  >
-                    {ownerData.companyData.employee_count}
-                  </Typography>
-                </Box>
-              )} */}
-            </Box>
-          </Box>
-        </CardContent>
-      </Card>
 
       {/* Personal Information */}
       <Card
         sx={{
           mb: 4,
           borderRadius: 4,
-          border: '1px solid #e0e0e0',
+          border: '1px solid #e2e8f0',
           overflow: 'hidden',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
         }}
       >
-        <Box sx={{ p: 4, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a1a1a', mb: 1 }}>
-            Personal Information
-          </Typography>
-          <Typography variant="body1" color="#666">
+        <Box
+          sx={{
+            p: 3,
+            backgroundColor: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
+              Personal Information
+            </Typography>
+            <Button
+              variant="outlined"
+              onClick={handleAddCompany} // Changed to add company for clarity
+              startIcon={<EditIcon />}
+              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+            >
+              Edit
+            </Button>
+          </Box>
+          <Typography variant="body2" color="#64748b">
             Personal details and contact information
           </Typography>
         </Box>
 
         <CardContent sx={{ p: 4 }}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <ReadOnlyInput label="Full Name" value={ownerData.name} icon={PersonIcon} />
-            </Grid>
-            <Grid item xs={12}>
-              <ReadOnlyInput
-                label="Email Address"
-                value={ownerData.email}
-                icon={EmailIcon}
-                isLink
+          <Grid container spacing={2} sx={{ display: 'flex' }}>
+            <Grid item xs={12} md={4} sx={{ flexGrow: 1 }}>
+              <StatCard
+                icon={PersonIcon}
+                label="Full Name"
+                value={ownerData.name}
+                sx={{ height: '100%', border: '1px solid #e2e8f0' }}
               />
             </Grid>
-            <Grid item xs={12}>
-              <ReadOnlyInput label="Phone Number" value={ownerData.phone} icon={PhoneIcon} isLink />
+
+            <Grid item xs={12} md={4} sx={{ flexGrow: 1 }}>
+              <StatCard
+                icon={EmailIcon}
+                label="Email Address"
+                value={ownerData.email}
+                isLink={true}
+                linkType="email"
+                sx={{ height: '100%', border: '1px solid #e2e8f0' }}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4} sx={{ flexGrow: 1 }}>
+              <StatCard
+                icon={PhoneIcon}
+                label="Phone Number"
+                value={ownerData.phone}
+                isLink={true}
+                linkType="phone"
+                sx={{ height: '100%', border: '1px solid #e2e8f0' }}
+              />
             </Grid>
           </Grid>
         </CardContent>
@@ -478,84 +436,205 @@ const OwnerDetailPage = () => {
         sx={{
           mb: 4,
           borderRadius: 4,
-          border: '1px solid #e0e0e0',
+          border: '1px solid #e2e8f0',
           overflow: 'hidden',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
         }}
       >
-        <Box sx={{ p: 4, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a1a1a', mb: 1 }}>
-            Company Information
-          </Typography>
-          <Typography variant="body1" color="#666">
+        <Box sx={{ p: 3, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
+              Company Information
+            </Typography>
+            <Button
+              variant="outlined"
+              onClick={handleAddCompany}
+              startIcon={<AddIcon />}
+              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+            >
+              Add
+            </Button>
+          </Box>
+          <Typography variant="body2" color="#64748b">
             Business details and company information
           </Typography>
         </Box>
 
-        <CardContent sx={{ p: 4 }}>
-          {!hasCompanyData ? (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <BusinessIcon sx={{ fontSize: 64, color: '#ccc', mb: 2 }} />
-              <Typography variant="h6" color="text.secondary" gutterBottom>
+        <CardContent sx={{ p: 0 }}>
+          {hasCompanies ? (
+            <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
+              <Table aria-label="companies table">
+                <TableHead sx={{ backgroundColor: '#f8fafc' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700, color: '#4a5568' }}>Company Name</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#4a5568' }}>Industry</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#4a5568' }}>Employees</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#4a5568' }}>Email</TableCell>
+                    <TableCell width={88} sx={{ fontWeight: 700, color: '#4a5568' }}>
+                      Actions
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {ownerData.companies.map((company, index) => (
+                    <TableRow
+                      key={index}
+                      sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                    >
+                      <TableCell>{company.name}</TableCell>
+                      <TableCell>{company.industry_type || 'N/A'}</TableCell>
+                      <TableCell>{company.employee_count || 'N/A'}</TableCell>
+                      <TableCell>
+                        <Link href={`mailto:${company.email}`} underline="none" color="primary">
+                          {company.email}
+                        </Link>
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <IconButton onClick={(e) => handleMenuOpen(e, company)}>
+                          <MoreVertIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 6, px: 4 }}>
+              <BusinessIcon sx={{ fontSize: 48, color: '#cbd5e1', mb: 2 }} />
+              <Typography variant="h6" color="#64748b" gutterBottom sx={{ fontWeight: 600 }}>
                 No Company Information
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                This owner hasn not completed company onboarding yet.
+              <Typography variant="body2" color="#94a3b8" sx={{ mb: 3 }}>
+                This owner has not completed company onboarding yet.
               </Typography>
-              <Button variant="contained" onClick={handleEdit} startIcon={<EditIcon />}>
-                Add Company Information
+              <Button
+                variant="outlined"
+                onClick={handleAddCompany}
+                startIcon={<AddIcon />}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                }}
+              >
+                Add Company Info
+              </Button>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Billing Information */}
+      <Card
+        sx={{
+          mb: 4,
+          borderRadius: 4,
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        }}
+      >
+        <Box sx={{ p: 3, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
+              Billing Information
+            </Typography>
+            <Button
+              variant="outlined"
+              onClick={handleAddCompany}
+              startIcon={<EditIcon />}
+              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+            >
+              Edit
+            </Button>
+          </Box>
+          <Typography variant="body2" color="#64748b">
+            Billing details and subscription information
+          </Typography>
+        </Box>
+        <CardContent sx={{ p: 4 }}>
+          {!hasCompanies ? (
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <BillingIcon sx={{ fontSize: 48, color: '#cbd5e1', mb: 2 }} />
+              <Typography variant="h6" color="#64748b" gutterBottom sx={{ fontWeight: 600 }}>
+                No Billing Information
+              </Typography>
+              <Typography variant="body2" color="#94a3b8" sx={{ mb: 3 }}>
+                Billing information will be available after company setup.
+              </Typography>
+              <Button
+                variant="outlined"
+                onClick={handleAddCompany}
+                startIcon={<AddIcon />}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                }}
+              >
+                Complete Setup
               </Button>
             </Box>
           ) : (
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={3}>
-                <ReadOnlyInput
-                  label="Company Name"
-                  value={ownerData.companyData.name}
-                  icon={BusinessIcon}
+            <Grid container spacing={2} sx={{ display: 'flex' }}>
+              <Grid item xs={12} md={4} sx={{ flexGrow: 1 }}>
+                <StatCard
+                  icon={TeamIcon}
+                  label="Total Active Employees"
+                  value="346"
+                  sx={{ height: '100%', border: '1px solid #e2e8f0' }}
                 />
               </Grid>
-              <Grid item xs={12} md={3}>
-                <ReadOnlyInput
-                  label="Industry Type"
-                  value={ownerData.companyData.industry_type}
-                  icon={FactoryIcon}
+              <Grid item xs={12} md={4} sx={{ flexGrow: 1 }}>
+                <StatCard
+                  icon={BillingIcon}
+                  label="Current Plan"
+                  value="Enterprise"
+                  sx={{ height: '100%', border: '1px solid #e2e8f0' }}
                 />
               </Grid>
-              <Grid item xs={12} md={3}>
-                <ReadOnlyInput
-                  label="Employee Count"
-                  value={ownerData.companyData.employee_count}
-                  icon={PeopleIcon}
-                />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <ReadOnlyInput
-                  label="Company Email"
-                  value={ownerData.companyData.email}
-                  icon={EmailIcon}
-                  isLink
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <ReadOnlyInput
-                  label="Company Website"
-                  value={ownerData.companyData.website}
-                  icon={WebsiteIcon}
-                  isLink
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <ReadOnlyInput
-                  label="Company Address"
-                  value={ownerData.companyData.office_address}
-                  icon={LocationIcon}
+              <Grid item xs={12} md={4} sx={{ flexGrow: 1 }}>
+                <StatCard
+                  icon={RevenueIcon}
+                  label="Monthly Revenue"
+                  value="$2,123"
+                  sx={{ height: '100%', border: '1px solid #e2e8f0' }}
                 />
               </Grid>
             </Grid>
           )}
         </CardContent>
       </Card>
+
+      {/* Action Menu for Companies */}
+      <CustomPopover
+        open={Boolean(anchorEl)}
+        anchorEl={anchorEl}
+        onClose={handleMenuClose}
+        slotProps={{
+          arrow: {
+            placement: 'right-center',
+            offset: 14,
+            size: 15,
+          },
+          paper: {
+            sx: {
+              borderRadius: 2,
+              boxShadow: (theme) => theme.shadows[6],
+              maxWidth: 140,
+            },
+          },
+        }}
+      >
+        <MenuList>
+          <MenuItem onClick={() => handleEdit(selectedCompany)}>
+            <EditIcon fontSize="small" sx={{ mr: 1 }} />
+            Edit
+          </MenuItem>
+          {/* Add more actions here if needed */}
+        </MenuList>
+      </CustomPopover>
     </Container>
   );
 };
