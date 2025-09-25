@@ -25,7 +25,7 @@ import {
   TableRow,
   MenuList,
   MenuItem,
-  IconButton, // Added IconButton
+  IconButton,
 } from '@mui/material';
 import {
   Email as EmailIcon,
@@ -43,7 +43,7 @@ import {
   TrendingUp as RevenueIcon,
   Groups as TeamIcon,
   Add as AddIcon,
-  MoreVert as MoreVertIcon, // Added MoreVertIcon
+  MoreVert as MoreVertIcon,
 } from '@mui/icons-material';
 
 import { CustomPopover } from 'src/components/custom-popover';
@@ -109,72 +109,37 @@ const OwnerDetailPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownerId, companyIdParam]);
 
-  // Handle edit action for a specific company
+  // Updated: Handle edit action for a specific company
   const handleEdit = (company) => {
     if (!ownerData || !company) return;
 
     // Close the popover
     handleMenuClose();
 
+    // Navigate to company management page for editing
+    router.push(
+      `/dashboard/company-management?owner_id=${ownerData.id}&company_id=${company.company_id || company.id}`
+    );
+  };
+
+  // Updated: Function to add a new company
+  const handleAddCompany = () => {
+    if (!ownerData) return;
+
+    // Navigate to company management page for creating new company
+    router.push(`/dashboard/company-management?owner_id=${ownerData.id}`);
+  };
+
+  // Updated: Handle Edit Owner button
+  const handleEditOwner = () => {
+    if (!ownerData) return;
+
     try {
-      localStorage.removeItem('edit_owner_data');
-      localStorage.removeItem('active_step');
-      localStorage.removeItem('created_owner_id');
-
-      const editData = {
-        isEdit: true,
-        owner: {
-          id: ownerData.id,
-          username: ownerData.name,
-          firstName: ownerData.firstName,
-          lastName: ownerData.lastName,
-          email: ownerData.email,
-          phone: ownerData.phone,
-        },
-        company: {
-          id: company.id,
-          name: company.name || '',
-          website: company.website || '',
-          email: company.email || ownerData.email,
-          phone: company.phone || '',
-          office_address: company.office_address || '',
-          industry_type: company.industry_type || '',
-          employee_count: company.employee_count || '',
-        },
-      };
-
-      localStorage.setItem('edit_owner_data', JSON.stringify(editData));
-      router.push(`/dashboard/owners/create-owners?edit=${ownerData.id}&company_id=${company.id}`);
+      // Navigate to owner management page in edit mode
+      router.push(`/dashboard/owner-management?owner_id=${ownerData.id}`);
     } catch (error_) {
       console.error('Error preparing edit data:', error_);
       toast.error('Failed to prepare edit data');
-    }
-  };
-
-  // Function to add a new company, without a specific company object
-  const handleAddCompany = () => {
-    if (!ownerData) return;
-    try {
-      localStorage.removeItem('edit_owner_data');
-      localStorage.removeItem('active_step');
-      localStorage.removeItem('created_owner_id');
-      const editData = {
-        isEdit: true,
-        owner: {
-          id: ownerData.id,
-          username: ownerData.name,
-          firstName: ownerData.firstName,
-          lastName: ownerData.lastName,
-          email: ownerData.email,
-          phone: ownerData.phone,
-        },
-        company: null, // No company data for adding a new one
-      };
-      localStorage.setItem('edit_owner_data', JSON.stringify(editData));
-      router.push(`/dashboard/owners/create-owners?edit=${ownerData.id}`);
-    } catch (error_) {
-      console.error('Error preparing add data:', error_);
-      toast.error('Failed to prepare add company data');
     }
   };
 
@@ -239,7 +204,7 @@ const OwnerDetailPage = () => {
             sx={{
               color: '#1e293b',
               fontWeight: 600,
-              fontSize: '1.2rem',
+              fontSize: '1.1rem',
             }}
           >
             {value}
@@ -351,7 +316,7 @@ const OwnerDetailPage = () => {
       {/* Header Section */}
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h3" sx={{ fontWeight: 700, color: '#1a1a1a', mb: 1 }}>
+          <Typography variant="h4" sx={{ fontWeight: 700, color: '#1a1a1a', mb: 1 }}>
             Owner Profile
           </Typography>
           <Typography variant="h6" color="#666" sx={{ fontWeight: 400 }}>
@@ -383,11 +348,11 @@ const OwnerDetailPage = () => {
             </Typography>
             <Button
               variant="outlined"
-              onClick={handleAddCompany} // Changed to add company for clarity
+              onClick={handleEditOwner}
               startIcon={<EditIcon />}
               sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
             >
-              Edit
+              Edit Owner
             </Button>
           </Box>
           <Typography variant="body2" color="#64748b">
@@ -411,8 +376,6 @@ const OwnerDetailPage = () => {
                 icon={EmailIcon}
                 label="Email Address"
                 value={ownerData.email}
-                isLink={true}
-                linkType="email"
                 sx={{ height: '100%', border: '1px solid #e2e8f0' }}
               />
             </Grid>
@@ -422,8 +385,6 @@ const OwnerDetailPage = () => {
                 icon={PhoneIcon}
                 label="Phone Number"
                 value={ownerData.phone}
-                isLink={true}
-                linkType="phone"
                 sx={{ height: '100%', border: '1px solid #e2e8f0' }}
               />
             </Grid>
@@ -452,7 +413,7 @@ const OwnerDetailPage = () => {
               startIcon={<AddIcon />}
               sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
             >
-              Add
+              Add Company
             </Button>
           </Box>
           <Typography variant="body2" color="#64748b">
@@ -460,15 +421,15 @@ const OwnerDetailPage = () => {
           </Typography>
         </Box>
 
-        <CardContent sx={{ p: 0 }}>
+        <CardContent sx={{ p: 4 }}>
           {hasCompanies ? (
             <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
               <Table aria-label="companies table">
                 <TableHead sx={{ backgroundColor: '#f8fafc' }}>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 700, color: '#4a5568' }}>Company Name</TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: '#4a5568' }}>Industry</TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: '#4a5568' }}>Employees</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#4a5568' }}>Industry Type</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#4a5568' }}>Employee Count</TableCell>
                     <TableCell sx={{ fontWeight: 700, color: '#4a5568' }}>Email</TableCell>
                     <TableCell width={88} sx={{ fontWeight: 700, color: '#4a5568' }}>
                       Actions
@@ -483,7 +444,7 @@ const OwnerDetailPage = () => {
                     >
                       <TableCell>{company.name}</TableCell>
                       <TableCell>{company.industry_type || 'N/A'}</TableCell>
-                      <TableCell>{company.employee_count || 'N/A'}</TableCell>
+                      <TableCell>{company.employees_count}</TableCell>
                       <TableCell>
                         <Link href={`mailto:${company.email}`} underline="none" color="primary">
                           {company.email}
@@ -546,7 +507,7 @@ const OwnerDetailPage = () => {
               startIcon={<EditIcon />}
               sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
             >
-              Edit
+              Edit Billing
             </Button>
           </Box>
           <Typography variant="body2" color="#64748b">
@@ -632,7 +593,6 @@ const OwnerDetailPage = () => {
             <EditIcon fontSize="small" sx={{ mr: 1 }} />
             Edit
           </MenuItem>
-          {/* Add more actions here if needed */}
         </MenuList>
       </CustomPopover>
     </Container>

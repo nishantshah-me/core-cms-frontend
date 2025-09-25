@@ -278,27 +278,85 @@ export async function getCompanyById(companyId) {
 
 /**
  * Fetch owners with their companies (backend now includes companies in the response)
- * @param {number} skip - Number of records to skip
- * @param {number} limit - Number of records per page
+ * @param {Object} options - Filter options
+ * @param {number} options.skip - Number of records to skip (default: 0)
+ * @param {number} options.limit - Number of records per page (default: 10)
+ * @param {string} options.search - Search query for username, email, or phone
+ * @param {string} options.month - Month filter (1-12)
+ * @param {string} options.year - Year filter
  */
-export async function getOwnersWithCompanies(skip = 0, limit = 10) {
+export async function getOwnersWithCompanies(options = {}) {
   try {
+    const { skip = 0, limit = 10, search, month, year } = options;
+
+    // Build query parameters
+    const params = new URLSearchParams({
+      skip: skip.toString(),
+      limit: limit.toString(),
+    });
+
+    // Add optional parameters only if they have values
+    if (search && search.trim()) {
+      params.append('search', search.trim());
+    }
+
+    if (month && month.toString().trim()) {
+      params.append('month', month.toString());
+    }
+
+    if (year && year.toString().trim()) {
+      params.append('year', year.toString());
+    }
+
     const response = await apiClient({
       method: 'GET',
-      url: `${BASE_URL}${endpoints.company.get_company_owners}?skip=${skip}&limit=${limit}`,
+      url: `${BASE_URL}${endpoints.company.get_company_owners}?${params.toString()}`,
       headers: getAuthHeaders(),
     });
 
     const { data = [], total = 0 } = response || {};
 
-    const formattedData = data.map((owner) => ({
-      id: owner.id,
-      name: owner.username || '-',
-      email: owner.email || '-',
-      phone: owner.phone || '-',
-      companyCount: owner.company_count || 0,
-      ownerData: owner,
-    }));
+    // Format the data to match your UI expectations
+    const formattedData = data.map((owner) => {
+      // Get the first company for backward compatibility
+      const firstCompany =
+        owner.companies && owner.companies.length > 0 ? owner.companies[0] : null;
+
+      return {
+        id: owner.id,
+        name: owner.username || '-',
+        firstName: owner.username?.split(' ')[0] || '',
+        lastName: owner.username?.split(' ').slice(1).join(' ') || '',
+        email: owner.email || '-',
+        phone: owner.phone || '-',
+        isEmailVerified: owner.is_email_verified || false,
+        isPhoneVerified: owner.is_phone_verified || false,
+        companyCount: owner.company_count || 0,
+        totalEmployeeCount: owner.total_employee_count || 0,
+
+        // First company data for backward compatibility
+        companyId: firstCompany?.id || null,
+        companyData: firstCompany
+          ? {
+              id: firstCompany.id,
+              name: firstCompany.name || '',
+              phone: firstCompany.phone || '',
+              email: firstCompany.email || '',
+              office_address: firstCompany.address || '',
+              website: firstCompany.created_at || '', // Note: This seems to be storing website in created_at field based on your API response
+              industry_type: firstCompany.industry_type || '',
+              employee_range: firstCompany.employee_range || '',
+              employee_count: firstCompany.employee_count || 0,
+            }
+          : null,
+
+        // Store the full owner data including all companies
+        ownerData: {
+          ...owner,
+          companies: owner.companies || [],
+        },
+      };
+    });
 
     return {
       data: formattedData,
@@ -306,6 +364,8 @@ export async function getOwnersWithCompanies(skip = 0, limit = 10) {
     };
   } catch (error) {
     console.error('Error fetching owners with companies:', error);
+
+    // Return empty result instead of throwing to prevent UI crashes
     return {
       data: [],
       total: 0,

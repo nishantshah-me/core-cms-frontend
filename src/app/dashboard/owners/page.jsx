@@ -2,7 +2,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -22,11 +22,15 @@ import {
   Container,
   Breadcrumbs,
   Link,
-  // Checkbox,
   TableContainer,
   MenuList,
   Alert,
   CircularProgress,
+  TextField,
+  InputAdornment,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -36,6 +40,8 @@ import {
   NavigateNext as NavigateNextIcon,
   NavigateBefore as NavigateBeforeIcon,
   Visibility as VisibilityIcon,
+  Search as SearchIcon,
+  Clear as ClearIcon,
 } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
@@ -46,6 +52,34 @@ import {
   deleteCompany,
 } from 'src/auth/services/ownerCompanyService';
 import { LogoLoader } from 'src/components/loading-screen/LogoLoader';
+import lodash from 'lodash';
+
+// Generate month options
+const monthOptions = [
+  { value: '', label: 'All Months' },
+  { value: '1', label: 'January' },
+  { value: '2', label: 'February' },
+  { value: '3', label: 'March' },
+  { value: '4', label: 'April' },
+  { value: '5', label: 'May' },
+  { value: '6', label: 'June' },
+  { value: '7', label: 'July' },
+  { value: '8', label: 'August' },
+  { value: '9', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+];
+
+// Generate year options (current year ± 5 years)
+const currentYear = new Date().getFullYear();
+const yearOptions = [
+  { value: '', label: 'All Years' },
+  ...Array.from({ length: 11 }, (_, i) => {
+    const year = currentYear - 5 + i;
+    return { value: year.toString(), label: year.toString() };
+  }),
+];
 
 const Page = () => {
   const router = useRouter();
@@ -58,29 +92,35 @@ const Page = () => {
   const [error, setError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Pagination state - Default to 10 records per page
+  // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Load owners from API
-  useEffect(() => {
-    loadOwnersData();
-  }, [page, rowsPerPage]);
+  // Filter states
+  const [inputValue, setInputValue] = useState(''); // what user is typing (immediate)
+  const [searchQuery, setSearchQuery] = useState(''); // debounced value used for API
 
-  const loadOwnersData = async () => {
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const [selectedYear, setSelectedYear] = useState('');
+
+  // Load owners from API with filters
+  const loadOwnersData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
       const skip = page * rowsPerPage;
-      const ownersData = await getOwnersWithCompanies(skip, rowsPerPage);
 
-      // The service now returns { data: [], total: number }
-      if (ownersData && typeof ownersData === 'object' && ownersData.data) {
+      const filters = { skip, limit: rowsPerPage };
+      if (searchQuery.trim()) filters.search = searchQuery.trim();
+      if (selectedMonth) filters.month = selectedMonth;
+      if (selectedYear) filters.year = selectedYear;
+
+      const ownersData = await getOwnersWithCompanies(filters);
+      if (ownersData?.data) {
         setOwners(ownersData.data);
         setTotalCount(ownersData.total || 0);
       } else {
-        // Fallback for old format
         setOwners(ownersData || []);
         setTotalCount(ownersData?.length || 0);
       }
@@ -93,24 +133,56 @@ const Page = () => {
     } finally {
       setLoading(false);
     }
+  }, [page, rowsPerPage, searchQuery, selectedMonth, selectedYear]);
+
+  // Debounced function: updates the actual searchQuery
+  const debouncedSetSearchQuery = useMemo(
+    () =>
+      lodash.debounce((val) => {
+        setSearchQuery(val);
+        setPage(0); // reset pagination
+      }, 500), // wait 500ms after user stops typing
+    []
+  );
+
+  // Initial load and reload when filters change
+  useEffect(() => {
+    loadOwnersData();
+  }, [loadOwnersData]);
+
+  //Cancel debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSetSearchQuery.cancel();
+    };
+  }, [debouncedSetSearchQuery]);
+
+  const handleSearchChange = (event) => {
+    const val = event.target.value;
+    setInputValue(val); // update immediate input for TextField
+    debouncedSetSearchQuery(val); // update debounced query for API
   };
 
-  // const handleSelectAll = (checked) => {
-  //   if (checked) {
-  //     setSelected(owners.map((owner) => owner.id));
-  //   } else {
-  //     setSelected([]);
-  //   }
-  // };
+  const handleClearSearch = () => {
+    setInputValue('');
+    setSearchQuery('');
+    setPage(0);
+  };
 
-  // const handleSelectOne = (ownerId) => {
-  //   setSelected((prev) =>
-  //     prev.includes(ownerId) ? prev.filter((id) => id !== ownerId) : [...prev, ownerId]
-  //   );
-  // };
+  const handleMonthChange = (event) => {
+    setSelectedMonth(event.target.value);
+    setPage(0);
+  };
+
+  const handleYearChange = (event) => {
+    setSelectedYear(event.target.value);
+    setPage(0);
+  };
+
+  const hasActiveFilters = searchQuery || selectedMonth || selectedYear;
 
   const handleMenuOpen = (event, owner) => {
-    event.stopPropagation(); // Prevent row click when opening menu
+    event.stopPropagation();
     setAnchorEl(event.currentTarget);
     setSelectedOwner(owner);
   };
@@ -120,13 +192,10 @@ const Page = () => {
     setSelectedOwner(null);
   };
 
-  // Handle row click to navigate to detail page
   const handleRowClick = (owner) => {
     try {
       const ownerId = owner.id;
-      const companyId = owner.ownerData?.companies?.[0]?.id || null; // first company if available
-
-      // Navigate with query params
+      const companyId = owner.ownerData?.companies?.[0]?.id || null;
       router.push(
         `/dashboard/owner-detail?owner_id=${ownerId}${companyId ? `&company_id=${companyId}` : ''}`
       );
@@ -138,16 +207,14 @@ const Page = () => {
 
   const handleEdit = () => {
     if (selectedOwner) {
-      // Clear any existing edit data and localStorage items
       localStorage.removeItem('edit_owner_data');
       localStorage.removeItem('active_step');
       localStorage.removeItem('created_owner_id');
 
-      // Prepare the edit data with both owner and company information
       const editData = {
         isEdit: true,
         owner: {
-          id: selectedOwner.id, // Owner UUID
+          id: selectedOwner.id,
           username: selectedOwner.name,
           firstName: selectedOwner.firstName,
           lastName: selectedOwner.lastName,
@@ -155,7 +222,7 @@ const Page = () => {
           phone: selectedOwner.phone,
         },
         company: {
-          id: selectedOwner.companyId, // Company ID (number) - could be null
+          id: selectedOwner.companyId,
           name: selectedOwner.companyData?.name || '',
           website: selectedOwner.companyData?.website || '',
           email: selectedOwner.companyData?.email || selectedOwner.email,
@@ -166,10 +233,7 @@ const Page = () => {
         },
       };
 
-      // Store the edit data
       localStorage.setItem('edit_owner_data', JSON.stringify(editData));
-
-      // Navigate to edit page with owner ID
       router.push(`/dashboard/owners/create-owners?edit=${selectedOwner.id}`);
     }
     handleMenuClose();
@@ -177,35 +241,23 @@ const Page = () => {
 
   const handleDeleteSingle = async () => {
     if (!selectedOwner) return;
-
     try {
       setIsDeleting(true);
       setError('');
-
-      // Delete company first if it exists
       if (selectedOwner.companyId) {
         try {
           await deleteCompany(selectedOwner.companyId);
           toast.success('Company deleted successfully');
         } catch (companyError) {
           console.warn('Company deletion failed:', companyError);
-          toast('Company deletion failed, continuing with owner deletion', {
-            icon: '⚠️',
-          });
+          toast('Company deletion failed, continuing with owner deletion', { icon: '⚠️' });
         }
       }
-
-      // Delete owner
       await deleteOwner(selectedOwner.id);
       toast.success('Owner deleted successfully');
-
-      // Refresh the data after deletion
       await loadOwnersData();
-
       setDeleteDialog(false);
       setSelectedOwner(null);
-
-      // Clear selection if deleted item was selected
       setSelected((prev) => prev.filter((id) => id !== selectedOwner.id));
     } catch (err) {
       console.error('Error deleting owner:', err);
@@ -218,7 +270,6 @@ const Page = () => {
   };
 
   const handleAdd = () => {
-    // Clear any existing data when adding new owner
     localStorage.removeItem('edit_owner_data');
     localStorage.removeItem('active_step');
     localStorage.removeItem('created_owner_id');
@@ -227,13 +278,13 @@ const Page = () => {
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
-    setSelected([]); // Clear selection when changing pages
+    setSelected([]);
   };
 
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
-    setSelected([]); // Clear selection when changing rows per page
+    setSelected([]);
   };
 
   const handleViewDetails = () => {
@@ -243,17 +294,9 @@ const Page = () => {
     handleMenuClose();
   };
 
-  if (loading && page === 0) {
+  if (loading && page === 0 && !hasActiveFilters) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '80vh',
-          width: '100%',
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <LogoLoader />
       </Box>
     );
@@ -280,27 +323,79 @@ const Page = () => {
         </Alert>
       )}
 
-      {/* Header with Add Button */}
+      {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Owners</Typography>
+        <Typography variant="h4">Owners List</Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd}>
           Add Owner
         </Button>
       </Box>
 
+      {/* Search + Filters */}
+      <Card sx={{ p: 2, mb: 3 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+          }}
+        >
+          <TextField
+            fullWidth
+            placeholder="Search by owner name, email, or phone"
+            value={inputValue}
+            onChange={handleSearchChange}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+              endAdornment: inputValue && (
+                <InputAdornment position="end">
+                  <IconButton onClick={handleClearSearch} size="small">
+                    <ClearIcon />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+            sx={{ maxWidth: { md: 400 } }}
+          />
+
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <FormControl sx={{ minWidth: 150 }}>
+              <InputLabel>Month</InputLabel>
+              <Select value={selectedMonth} onChange={handleMonthChange} label="Month">
+                {monthOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl sx={{ minWidth: 150 }}>
+              <InputLabel>Year</InputLabel>
+              <Select value={selectedYear} onChange={handleYearChange} label="Year">
+                {yearOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </Box>
+      </Card>
+
       {/* Table */}
-      <Card>
+      <Card sx={{ p: 2 }}>
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
-                {/* <TableCell padding="checkbox">
-                  <Checkbox
-                    checked={selected.length === owners.length && owners.length > 0}
-                    indeterminate={selected.length > 0 && selected.length < owners.length}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                  />
-                </TableCell> */}
                 <TableCell>Name</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Phone</TableCell>
@@ -309,30 +404,34 @@ const Page = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading && page > 0 ? (
+              {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} sx={{ textAlign: 'center', py: 3 }}>
+                  <TableCell colSpan={5} sx={{ textAlign: 'center', py: 3 }}>
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
               ) : owners.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={5}>
                     <Card sx={{ textAlign: 'center', py: 7, boxShadow: 'none' }}>
                       <Typography variant="h6" color="text.secondary" gutterBottom>
-                        No owners added yet
+                        {hasActiveFilters ? 'No owners found' : 'No owners added yet'}
                       </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                        Add your owner information to complete the onboarding process
+                        {hasActiveFilters
+                          ? 'Try adjusting your search criteria or clear filters'
+                          : 'Add your owner information to complete the onboarding process'}
                       </Typography>
-                      <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={handleAdd}
-                        size="large"
-                      >
-                        Add Owner
-                      </Button>
+                      {!hasActiveFilters && (
+                        <Button
+                          variant="contained"
+                          startIcon={<AddIcon />}
+                          onClick={handleAdd}
+                          size="large"
+                        >
+                          Add Owner
+                        </Button>
+                      )}
                     </Card>
                   </TableCell>
                 </TableRow>
@@ -350,12 +449,6 @@ const Page = () => {
                       },
                     }}
                   >
-                    {/* <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selected.includes(owner.id)}
-                        onChange={() => handleSelectOne(owner.id)}
-                      />
-                    </TableCell> */}
                     <TableCell>
                       <Typography variant="body2" fontWeight="medium">
                         {owner.name}
@@ -382,7 +475,7 @@ const Page = () => {
           </Table>
         </TableContainer>
 
-        {/* Custom Pagination - Only shows page numbers with arrows */}
+        {/* Custom Pagination */}
         {totalCount > 0 && (
           <Box
             sx={{
@@ -393,7 +486,6 @@ const Page = () => {
               gap: 2,
             }}
           >
-            {/* Previous Button */}
             <IconButton
               onClick={() => handleChangePage(null, page - 1)}
               disabled={page === 0}
@@ -408,12 +500,10 @@ const Page = () => {
               <NavigateBeforeIcon />
             </IconButton>
 
-            {/* Page Info */}
             <Typography variant="body2" sx={{ mx: 2 }}>
               Page {page + 1} of {Math.ceil(totalCount / rowsPerPage)}
             </Typography>
 
-            {/* Next Button */}
             <IconButton
               onClick={() => handleChangePage(null, page + 1)}
               disabled={page >= Math.ceil(totalCount / rowsPerPage) - 1}
@@ -429,23 +519,16 @@ const Page = () => {
               <NavigateNextIcon />
             </IconButton>
 
-            {/* Rows per page selection */}
             <Box sx={{ ml: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body2">Rows:</Typography>
-              <select
-                value={rowsPerPage}
-                onChange={(e) => handleChangeRowsPerPage(e)}
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  border: '1px solid #ccc',
-                }}
-              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
+              <FormControl size="small" sx={{ minWidth: 80 }}>
+                <Select value={rowsPerPage} onChange={(e) => handleChangeRowsPerPage(e)}>
+                  <MenuItem value={5}>5</MenuItem>
+                  <MenuItem value={10}>10</MenuItem>
+                  <MenuItem value={25}>25</MenuItem>
+                  <MenuItem value={50}>50</MenuItem>
+                </Select>
+              </FormControl>
             </Box>
           </Box>
         )}
