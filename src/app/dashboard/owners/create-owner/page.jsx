@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import {
   Box,
   Card,
@@ -27,20 +27,8 @@ import {
   CircularProgress,
   Grid,
 } from '@mui/material';
-import {
-  ArrowBack as ArrowBackIcon,
-  Check as CheckIcon,
-  Save as SaveIcon,
-} from '@mui/icons-material';
-import {
-  sendOwnerOTP,
-  verifyOwnerOTP,
-  updateOwnerUsernameOnly,
-  createCompany,
-  updateCompany,
-  getOwnerById,
-  getCompanyById, // Add this import
-} from 'src/auth/services/ownerCompanyService';
+import { ArrowBack as ArrowBackIcon, Check as CheckIcon } from '@mui/icons-material';
+import { sendOwnerOTP, verifyOwnerOTP, createCompany } from 'src/auth/services/ownerCompanyService';
 import toast from 'react-hot-toast';
 
 // Industry and employee count options
@@ -59,35 +47,12 @@ const steps = ['Owner Onboarding', 'Company Onboarding'];
 
 const Page = () => {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   // Safe initialization to avoid hydration errors
   const [activeStep, setActiveStep] = useState(0);
   const [createdOwnerId, setCreatedOwnerId] = useState(null);
-  const [isEdit, setIsEdit] = useState(false);
-  const [editOwnerData, setEditOwnerData] = useState(null);
-  const [editCompanyData, setEditCompanyData] = useState(null); // Add this state
-  const [hasExistingCompany, setHasExistingCompany] = useState(false);
   const [error, setError] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isLoadingEditData, setIsLoadingEditData] = useState(false);
-  const [isLoadingCompanyData, setIsLoadingCompanyData] = useState(false); // Add this state
-
-  // Store original values for change detection
-  const [originalOwnerData, setOriginalOwnerData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-  });
-
-  const [originalCompanyData, setOriginalCompanyData] = useState({
-    companyName: '',
-    industryType: '',
-    companyEmail: '',
-    companyAddress: '',
-    employeeCount: '',
-    companyURL: '',
-  }); // Add this state
 
   // Owner state
   const [ownerFormData, setOwnerFormData] = useState({
@@ -120,36 +85,12 @@ const Page = () => {
     companyAddress: '',
     employeeCount: '',
     companyURL: '',
+    companyPhone: '',
   });
   const [companyErrors, setCompanyErrors] = useState({});
 
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Helper function to detect field changes
-  const getChangedFields = () => {
-    if (!isEdit) return { email: true, phone: true, username: true };
-
-    return {
-      email: originalOwnerData.email !== ownerFormData.email,
-      phone: originalOwnerData.phone !== ownerFormData.phone,
-      username: originalOwnerData.fullName !== ownerFormData.fullName,
-    };
-  };
-
-  // Helper function to detect company field changes
-  const getChangedCompanyFields = () => {
-    if (!isEdit || !hasExistingCompany) return true; // All fields are new
-
-    return {
-      companyName: originalCompanyData.companyName !== companyFormData.companyName,
-      industryType: originalCompanyData.industryType !== companyFormData.industryType,
-      companyEmail: originalCompanyData.companyEmail !== companyFormData.companyEmail,
-      companyAddress: originalCompanyData.companyAddress !== companyFormData.companyAddress,
-      employeeCount: originalCompanyData.employeeCount !== companyFormData.employeeCount,
-      companyURL: originalCompanyData.companyURL !== companyFormData.companyURL,
-    };
-  };
 
   // Initialize data from localStorage after component mounts to avoid hydration issues
   useEffect(() => {
@@ -169,188 +110,6 @@ const Page = () => {
       setIsInitialized(true);
     }
   }, []);
-
-  // Load edit data from API when in edit mode
-  const loadEditDataFromAPI = async (ownerId) => {
-    try {
-      setIsLoadingEditData(true);
-      setError('');
-
-      const ownerData = await getOwnerById(ownerId);
-
-      if (!ownerData) {
-        throw new Error('Owner not found');
-      }
-
-      setEditOwnerData(ownerData);
-
-      // Check if company exists
-      const companyExists = ownerData.companyData && ownerData.companyData.id;
-      setHasExistingCompany(companyExists);
-
-      // Populate owner form data
-      const ownerFormValues = {
-        fullName: ownerData.name || '',
-        email: ownerData.email || '',
-        phone: ownerData.phone || '',
-      };
-
-      setOwnerFormData(ownerFormValues);
-      // Store original data for change detection
-      setOriginalOwnerData(ownerFormValues);
-
-      // Initialize company form data (will be populated later when company step is accessed)
-      if (companyExists) {
-        // Set initial company data from owner response as fallback
-        const initialCompanyData = {
-          companyName: ownerData.companyData.name || '',
-          industryType: ownerData.companyData.industry_type || '',
-          companyEmail: ownerData.companyData.email || '',
-          companyAddress: ownerData.companyData.office_address || '',
-          employeeCount:
-            ownerData.companyData.employee_range || ownerData.companyData.employee_count || '',
-          companyURL: ownerData.companyData.website || '',
-        };
-        setCompanyFormData(initialCompanyData);
-        setOriginalCompanyData(initialCompanyData);
-      } else {
-        // Reset company form for owners without companies
-        const newCompanyData = {
-          companyName: '',
-          industryType: '',
-          companyEmail: ownerData.email || '', // Pre-fill with owner email
-          companyAddress: '',
-          employeeCount: '',
-          companyURL: '',
-        };
-        setCompanyFormData(newCompanyData);
-        setOriginalCompanyData(newCompanyData);
-      }
-
-      // For edit mode, initially assume verified (will change if fields are modified)
-      setOtpState((prev) => ({
-        ...prev,
-        isEmailVerified: true,
-        isPhoneVerified: true,
-      }));
-    } catch (error_) {
-      console.error('Error loading edit data from API:', error_);
-      toast.error(`Error loading owner data: ${error_.message}`);
-      setError(error_.message || 'Failed to load owner data');
-
-      // Redirect back to list if owner not found
-      if (error_.code === 'NOT_FOUND' || error_.message.includes('not found')) {
-        setTimeout(() => {
-          router.push('/dashboard/owners');
-        }, 2000);
-      }
-    } finally {
-      setIsLoadingEditData(false);
-    }
-  };
-
-  // Load company data specifically when accessing company step in edit mode
-  const loadCompanyDataForEdit = async () => {
-    if (!isEdit || !hasExistingCompany || !editOwnerData?.companyData?.id || editCompanyData) {
-      return; // Skip if not edit mode, no company, or already loaded
-    }
-
-    try {
-      setIsLoadingCompanyData(true);
-      setError('');
-
-      const companyData = await getCompanyById(editOwnerData.companyData.id);
-
-      if (!companyData) {
-        throw new Error('Company not found');
-      }
-
-      setEditCompanyData(companyData);
-
-      // Populate company form data with fresh data from API
-      const companyFormValues = {
-        companyName: companyData.name || '',
-        industryType: companyData.industry_type || '',
-        companyEmail: companyData.email || '',
-        companyAddress: companyData.office_address || '',
-        employeeCount: companyData.employee_count_range || companyData.employee_count || '',
-        companyURL: companyData.website || '',
-      };
-
-      setCompanyFormData(companyFormValues);
-      setOriginalCompanyData(companyFormValues);
-    } catch (error_) {
-      console.error('Error loading company data from API:', error_);
-      toast.error(`Error loading company data: ${error_.message}`);
-      setError(error_.message || 'Failed to load company data');
-    } finally {
-      setIsLoadingCompanyData(false);
-    }
-  };
-
-  // Handle edit mode and load data
-  useEffect(() => {
-    if (!isInitialized) return;
-
-    const editParam = searchParams.get('edit');
-    if (editParam) {
-      setIsEdit(true);
-      // Load data from API instead of localStorage
-      loadEditDataFromAPI(editParam);
-    } else {
-      // Reset form for new creation
-      setIsEdit(false);
-      setEditOwnerData(null);
-      setEditCompanyData(null);
-      setHasExistingCompany(false);
-      setOwnerFormData({
-        fullName: '',
-        email: '',
-        phone: '',
-      });
-      setCompanyFormData({
-        companyName: '',
-        industryType: '',
-        companyEmail: '',
-        companyAddress: '',
-        employeeCount: '',
-        companyURL: '',
-      });
-      setOriginalOwnerData({
-        fullName: '',
-        email: '',
-        phone: '',
-      });
-      setOriginalCompanyData({
-        companyName: '',
-        industryType: '',
-        companyEmail: '',
-        companyAddress: '',
-        employeeCount: '',
-        companyURL: '',
-      });
-      setOtpState({
-        isEmailVerified: false,
-        isPhoneVerified: false,
-        otpSent: false,
-        emailOtp: ['', '', '', '', '', ''],
-        phoneOtp: ['', '', '', '', '', ''],
-        isVerifying: false,
-        isSending: false,
-        resendTimer: 0,
-        otpError: '',
-        needsEmailVerification: false,
-        needsPhoneVerification: false,
-      });
-    }
-  }, [searchParams, isInitialized]);
-
-  // Load company data when stepping to company step in edit mode
-  useEffect(() => {
-    if (activeStep === 1 && isEdit && hasExistingCompany) {
-      loadCompanyDataForEdit();
-    }
-  }, [activeStep, isEdit, hasExistingCompany]);
 
   // Save active step to localStorage whenever it changes
   useEffect(() => {
@@ -387,51 +146,17 @@ const Page = () => {
       [field]: value,
     }));
 
-    // Enhanced change detection for edit mode
-    if (isEdit) {
-      const changedFields = {
-        email:
-          field === 'email'
-            ? originalOwnerData.email !== value
-            : originalOwnerData.email !== ownerFormData.email,
-        phone:
-          field === 'phone'
-            ? originalOwnerData.phone !== value
-            : originalOwnerData.phone !== ownerFormData.phone,
-        username:
-          field === 'fullName'
-            ? originalOwnerData.fullName !== value
-            : originalOwnerData.fullName !== ownerFormData.fullName,
-      };
-
-      // Reset verification status if email or phone changes
-      if (
-        (field === 'email' && changedFields.email) ||
-        (field === 'phone' && changedFields.phone)
-      ) {
-        setOtpState((prev) => ({
-          ...prev,
-          isEmailVerified: !changedFields.email,
-          isPhoneVerified: !changedFields.phone,
-          otpSent: false,
-          emailOtp: ['', '', '', '', '', ''],
-          phoneOtp: ['', '', '', '', '', ''],
-          otpError: '',
-        }));
-      }
-    } else {
-      // For new creation, reset verification if email or phone changes
-      if (field === 'email' || field === 'phone') {
-        setOtpState((prev) => ({
-          ...prev,
-          isEmailVerified: false,
-          isPhoneVerified: false,
-          otpSent: false,
-          emailOtp: ['', '', '', '', '', ''],
-          phoneOtp: ['', '', '', '', '', ''],
-          otpError: '',
-        }));
-      }
+    // For new creation, reset verification if email or phone changes
+    if (field === 'email' || field === 'phone') {
+      setOtpState((prev) => ({
+        ...prev,
+        isEmailVerified: false,
+        isPhoneVerified: false,
+        otpSent: false,
+        emailOtp: ['', '', '', '', '', ''],
+        phoneOtp: ['', '', '', '', '', ''],
+        otpError: '',
+      }));
     }
 
     if (ownerErrors[field]) {
@@ -448,8 +173,6 @@ const Page = () => {
   };
 
   const handleSendOTP = async () => {
-    const changedFields = getChangedFields();
-
     // Validation
     if (!ownerFormData.email || !/\S+@\S+\.\S+/.test(ownerFormData.email)) {
       setOwnerErrors((prev) => ({ ...prev, email: 'Please enter a valid email address' }));
@@ -466,39 +189,19 @@ const Page = () => {
       return;
     }
 
-    // Check if OTP is actually needed
-    if (isEdit && !changedFields.email && !changedFields.phone) {
-      toast.info('No changes detected in email or phone number');
-      return;
-    }
-
     setOtpState((prev) => ({ ...prev, isSending: true, otpError: '' }));
     setError('');
 
     try {
       const otpData = {
-        owner_id: isEdit ? editOwnerData.id : undefined,
+        email: ownerFormData.email.trim(),
+        phone: ownerFormData.phone.trim(),
+        username: ownerFormData.fullName.trim(),
       };
-
-      if (!isEdit || changedFields.email) {
-        otpData.email = ownerFormData.email.trim();
-      }
-      if (!isEdit || changedFields.phone) {
-        otpData.phone = ownerFormData.phone.trim();
-      }
-      if (!isEdit || changedFields.username) {
-        otpData.username = ownerFormData.fullName.trim();
-      }
 
       await sendOwnerOTP(otpData);
 
-      const message = isEdit
-        ? `OTP sent for verification of changed ${Object.keys(changedFields)
-            .filter((key) => changedFields[key])
-            .join(' and ')}`
-        : 'OTP sent to both email and phone successfully';
-
-      toast.success(message);
+      toast.success('OTP sent to both email and phone successfully');
 
       setOtpState((prev) => ({
         ...prev,
@@ -507,8 +210,8 @@ const Page = () => {
         resendTimer: 60,
         emailOtp: ['', '', '', '', '', ''],
         phoneOtp: ['', '', '', '', '', ''],
-        needsEmailVerification: !isEdit || changedFields.email,
-        needsPhoneVerification: !isEdit || changedFields.phone,
+        needsEmailVerification: true,
+        needsPhoneVerification: true,
       }));
     } catch (err) {
       console.error('OTP send error:', err);
@@ -549,14 +252,10 @@ const Page = () => {
   };
 
   const handleVerifyOTP = async () => {
-    const changedFields = getChangedFields();
     const emailOtpValue = otpState.emailOtp.join('');
     const phoneOtpValue = otpState.phoneOtp.join('');
 
-    const needsEmailOTP = !isEdit || changedFields.email;
-    const needsPhoneOTP = !isEdit || changedFields.phone;
-
-    if (needsEmailOTP && emailOtpValue.length !== 6) {
+    if (emailOtpValue.length !== 6) {
       setOtpState((prev) => ({
         ...prev,
         otpError: 'Please enter complete 6-digit email OTP',
@@ -564,7 +263,7 @@ const Page = () => {
       return;
     }
 
-    if (needsPhoneOTP && phoneOtpValue.length !== 6) {
+    if (phoneOtpValue.length !== 6) {
       setOtpState((prev) => ({
         ...prev,
         otpError: 'Please enter complete 6-digit phone OTP',
@@ -577,20 +276,12 @@ const Page = () => {
 
     try {
       const verifyData = {
-        owner_id: isEdit ? editOwnerData.id : undefined,
+        email: ownerFormData.email.trim(),
+        phone: ownerFormData.phone.trim(),
+        username: ownerFormData.fullName.trim(),
+        email_otp: emailOtpValue,
+        phone_otp: phoneOtpValue,
       };
-
-      if (needsEmailOTP) {
-        verifyData.email = ownerFormData.email.trim();
-        verifyData.email_otp = emailOtpValue;
-      }
-      if (needsPhoneOTP) {
-        verifyData.phone = ownerFormData.phone.trim();
-        verifyData.phone_otp = phoneOtpValue;
-      }
-      if (!isEdit || changedFields.username) {
-        verifyData.username = ownerFormData.fullName.trim();
-      }
 
       const response = await verifyOwnerOTP(verifyData);
 
@@ -598,10 +289,7 @@ const Page = () => {
         setCreatedOwnerId(response.owner_id);
       }
 
-      const message = isEdit
-        ? 'Owner information updated and verified successfully'
-        : 'Email and phone verified successfully';
-      toast.success(message);
+      toast.success('Email and phone verified successfully');
 
       setOtpState((prev) => ({
         ...prev,
@@ -609,8 +297,6 @@ const Page = () => {
         isPhoneVerified: true,
         isVerifying: false,
       }));
-
-      setOriginalOwnerData({ ...ownerFormData });
     } catch (err) {
       console.error('OTP verification error:', err);
       toast.error(`OTP verification error: ${err.message}`);
@@ -630,7 +316,6 @@ const Page = () => {
 
   const validateOwnerForm = () => {
     const newErrors = {};
-    const changedFields = getChangedFields();
 
     if (!ownerFormData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
@@ -646,21 +331,12 @@ const Page = () => {
       newErrors.phone = 'Phone number is required';
     }
 
-    if (!isEdit) {
-      if (!otpState.isEmailVerified || !otpState.isPhoneVerified) {
-        if (!otpState.isEmailVerified) {
-          newErrors.email = 'Please verify your email address';
-        }
-        if (!otpState.isPhoneVerified) {
-          newErrors.phone = 'Please verify your phone number';
-        }
+    if (!otpState.isEmailVerified || !otpState.isPhoneVerified) {
+      if (!otpState.isEmailVerified) {
+        newErrors.email = 'Please verify your email address';
       }
-    } else {
-      if (changedFields.email && !otpState.isEmailVerified) {
-        newErrors.email = 'Please verify your new email address';
-      }
-      if (changedFields.phone && !otpState.isPhoneVerified) {
-        newErrors.phone = 'Please verify your new phone number';
+      if (!otpState.isPhoneVerified) {
+        newErrors.phone = 'Please verify your phone number';
       }
     }
 
@@ -677,6 +353,12 @@ const Page = () => {
 
     if (!companyFormData.industryType) {
       newErrors.industryType = 'Industry type is required';
+    }
+
+    if (!companyFormData.companyPhone.trim()) {
+      newErrors.companyPhone = 'Company phone number is required';
+    } else if (!/^\d{7,15}$/.test(companyFormData.companyPhone)) {
+      newErrors.companyPhone = 'Please enter a valid phone number';
     }
 
     if (!companyFormData.companyEmail.trim()) {
@@ -712,46 +394,6 @@ const Page = () => {
       if (!validateOwnerForm()) {
         return;
       }
-
-      if (isEdit) {
-        const changedFields = getChangedFields();
-
-        if (!changedFields.username && !changedFields.email && !changedFields.phone) {
-          setActiveStep((prevActiveStep) => prevActiveStep + 1);
-          return;
-        }
-
-        try {
-          setIsSubmitting(true);
-
-          if (changedFields.username && !changedFields.email && !changedFields.phone) {
-            const ownerUpdateData = {
-              owner_id: editOwnerData.id,
-              username: ownerFormData.fullName.trim(),
-            };
-
-            await updateOwnerUsernameOnly(ownerUpdateData);
-            toast.success('Owner name updated successfully');
-
-            setOriginalOwnerData({ ...ownerFormData });
-          } else if (changedFields.email || changedFields.phone) {
-            if (!otpState.isEmailVerified || !otpState.isPhoneVerified) {
-              toast.error('Please verify the changed email/phone with OTP before continuing');
-              setIsSubmitting(false);
-              return;
-            }
-            toast.success('Owner information updated successfully');
-          }
-
-          setIsSubmitting(false);
-        } catch (err) {
-          console.error('Error updating owner:', err);
-          toast.error(`Error updating owner: ${err.message || err}`);
-          setError(err.message || 'Failed to update owner. Please try again.');
-          setIsSubmitting(false);
-          return;
-        }
-      }
     }
 
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -770,69 +412,28 @@ const Page = () => {
     setError('');
 
     try {
-      const changedCompanyFields = getChangedCompanyFields();
-      const hasCompanyChanges =
-        typeof changedCompanyFields === 'object'
-          ? Object.values(changedCompanyFields).some(Boolean)
-          : changedCompanyFields;
-
-      if (isEdit) {
-        if (hasExistingCompany && editOwnerData.companyData?.id) {
-          if (hasCompanyChanges) {
-            const companyUpdateData = {
-              name: companyFormData.companyName,
-              website: companyFormData.companyURL,
-              phone: ownerFormData.phone,
-              email: companyFormData.companyEmail,
-              office_address: companyFormData.companyAddress,
-              employee_count: companyFormData.employeeCount,
-              industry_type: companyFormData.industryType,
-            };
-
-            await updateCompany(editOwnerData.companyData.id, companyUpdateData);
-            toast.success('Company information updated successfully');
-          } else {
-            console.log('No changes detected in company information');
-          }
-        } else {
-          const companyData = {
-            owner_id: editOwnerData.id,
-            name: companyFormData.companyName,
-            website: companyFormData.companyURL,
-            phone: ownerFormData.phone,
-            email: companyFormData.companyEmail,
-            office_address: companyFormData.companyAddress,
-            employee_count: companyFormData.employeeCount,
-            industry_type: companyFormData.industryType,
-          };
-
-          await createCompany(companyData);
-          toast.success('Company created successfully');
-        }
-      } else {
-        const ownerId = createdOwnerId;
-        if (!ownerId) {
-          throw new Error('Owner ID not found. Please try the process again.');
-        }
-
-        const companyData = {
-          owner_id: ownerId,
-          name: companyFormData.companyName,
-          website: companyFormData.companyURL,
-          phone: ownerFormData.phone,
-          email: companyFormData.companyEmail,
-          office_address: companyFormData.companyAddress,
-          employee_count: companyFormData.employeeCount,
-          industry_type: companyFormData.industryType,
-        };
-
-        await createCompany(companyData);
-        toast.success('Owner and company created successfully');
+      const ownerId = createdOwnerId;
+      if (!ownerId) {
+        throw new Error('Owner ID not found. Please try the process again.');
       }
+
+      const companyData = {
+        owner_id: ownerId,
+        name: companyFormData.companyName,
+        website: companyFormData.companyURL,
+        phone: ownerFormData.phone,
+        email: companyFormData.companyEmail,
+        office_address: companyFormData.companyAddress,
+        employee_count: companyFormData.employeeCount,
+        industry_type: companyFormData.industryType,
+        phone: companyFormData.companyPhone,
+      };
+
+      await createCompany(companyData);
+      toast.success('Owner and company created successfully');
 
       localStorage.removeItem('active_step');
       localStorage.removeItem('created_owner_id');
-      localStorage.removeItem('edit_owner_data');
 
       router.push('/dashboard/owners');
     } catch (err) {
@@ -865,8 +466,6 @@ const Page = () => {
 
   const isContinueDisabled = () => {
     if (activeStep === 0) {
-      const changedFields = getChangedFields();
-
       if (
         !ownerFormData.fullName.trim() ||
         !ownerFormData.email.trim() ||
@@ -874,40 +473,20 @@ const Page = () => {
       ) {
         return true;
       }
-
-      if (!isEdit) {
-        return !otpState.isEmailVerified || !otpState.isPhoneVerified;
-      } else {
-        if (changedFields.email && !otpState.isEmailVerified) return true;
-        if (changedFields.phone && !otpState.isPhoneVerified) return true;
-        return false;
-      }
+      return !otpState.isEmailVerified || !otpState.isPhoneVerified;
     }
     return false;
   };
 
-  const shouldShowOTP = () => {
-    if (!isEdit) return true;
-
-    const changedFields = getChangedFields();
-    return changedFields.email || changedFields.phone;
-  };
-
   const shouldShowSendOTPButton = () => {
-    if (!isEdit) return !otpState.otpSent;
-
-    const changedFields = getChangedFields();
-    const hasRelevantChanges = changedFields.email || changedFields.phone;
-
-    return hasRelevantChanges && !otpState.otpSent;
+    return !otpState.otpSent;
   };
 
   const renderOTPSection = () => {
-    if (!shouldShowOTP() || !otpState.otpSent) return null;
+    if (!otpState.otpSent) return null;
 
-    const changedFields = getChangedFields();
-    const needsEmailOTP = (!isEdit || changedFields.email) && !otpState.isEmailVerified;
-    const needsPhoneOTP = (!isEdit || changedFields.phone) && !otpState.isPhoneVerified;
+    const needsEmailOTP = !otpState.isEmailVerified;
+    const needsPhoneOTP = !otpState.isPhoneVerified;
 
     if (!needsEmailOTP && !needsPhoneOTP) return null;
 
@@ -1088,19 +667,14 @@ const Page = () => {
               error={Boolean(ownerErrors.phone)}
               helperText={ownerErrors.phone}
               required
-              disabled={!isEdit && otpState.isPhoneVerified}
+              disabled={otpState.isPhoneVerified}
               sx={{
                 '& .MuiInputBase-root': {
-                  paddingRight:
-                    (!isEdit && otpState.isPhoneVerified) ||
-                    (isEdit && otpState.isPhoneVerified && !getChangedFields().phone)
-                      ? '120px'
-                      : 'inherit',
+                  paddingRight: otpState.isPhoneVerified ? '120px' : 'inherit',
                 },
               }}
             />
-            {((!isEdit && otpState.isPhoneVerified) ||
-              (isEdit && otpState.isPhoneVerified && !getChangedFields().phone)) && (
+            {otpState.isPhoneVerified && (
               <Box
                 sx={{
                   position: 'absolute',
@@ -1131,19 +705,14 @@ const Page = () => {
               error={Boolean(ownerErrors.email)}
               helperText={ownerErrors.email}
               required
-              disabled={!isEdit && otpState.isEmailVerified}
+              disabled={otpState.isEmailVerified}
               sx={{
                 '& .MuiInputBase-root': {
-                  paddingRight:
-                    (!isEdit && otpState.isEmailVerified) ||
-                    (isEdit && otpState.isEmailVerified && !getChangedFields().email)
-                      ? '120px'
-                      : 'inherit',
+                  paddingRight: otpState.isEmailVerified ? '120px' : 'inherit',
                 },
               }}
             />
-            {((!isEdit && otpState.isEmailVerified) ||
-              (isEdit && otpState.isEmailVerified && !getChangedFields().email)) && (
+            {otpState.isEmailVerified && (
               <Box
                 sx={{
                   position: 'absolute',
@@ -1203,20 +772,6 @@ const Page = () => {
           )}
 
           {renderOTPSection()}
-
-          {isEdit && (
-            <Box sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }}>
-              <Alert severity="info" sx={{ mt: 2 }}>
-                You are editing existing owner information.
-                {!hasExistingCompany && ' No company found - a new company will be created.'}
-                {hasExistingCompany && ' Existing company information will be updated.'}
-                <br />
-                <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
-                  Note: If you change email or phone number, you will need to verify them with OTP.
-                </Typography>
-              </Alert>
-            </Box>
-          )}
         </Box>
       </Card>
     </Box>
@@ -1224,27 +779,9 @@ const Page = () => {
 
   const renderCompanyStep = () => (
     <Box>
-      {isLoadingCompanyData && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-          <CircularProgress size={24} />
-          <Typography variant="body2" sx={{ ml: 2 }}>
-            Loading company data...
-          </Typography>
-        </Box>
-      )}
       <Card sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 3 }}>
           Company Information
-          {isEdit && !hasExistingCompany && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Creating new company for this owner
-            </Typography>
-          )}
-          {isEdit && hasExistingCompany && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Updating existing company information
-            </Typography>
-          )}
         </Typography>
         <Box
           sx={{
@@ -1261,7 +798,6 @@ const Page = () => {
             error={Boolean(companyErrors.companyName)}
             helperText={companyErrors.companyName}
             required
-            disabled={isLoadingCompanyData}
           />
           <FormControl fullWidth error={Boolean(companyErrors.industryType)} required>
             <InputLabel>Industry Type</InputLabel>
@@ -1269,7 +805,6 @@ const Page = () => {
               value={companyFormData.industryType}
               onChange={handleCompanyInputChange('industryType')}
               label="Industry Type"
-              disabled={isLoadingCompanyData}
             >
               {industryOptions.map((industry) => (
                 <MenuItem key={industry} value={industry}>
@@ -1290,26 +825,23 @@ const Page = () => {
             error={Boolean(companyErrors.companyEmail)}
             helperText={companyErrors.companyEmail}
             required
-            disabled={isLoadingCompanyData}
           />
           <TextField
             fullWidth
-            label="Company Address"
-            value={companyFormData.companyAddress}
-            onChange={handleCompanyInputChange('companyAddress')}
-            error={Boolean(companyErrors.companyAddress)}
-            helperText={companyErrors.companyAddress}
+            label="Company Number"
+            value={companyFormData.companyPhone}
+            onChange={handleCompanyInputChange('companyPhone')}
+            error={Boolean(companyErrors.companyPhone)}
+            helperText={companyErrors.companyPhone}
             required
-            multiline
-            disabled={isLoadingCompanyData}
           />
+
           <FormControl fullWidth error={Boolean(companyErrors.employeeCount)} required>
             <InputLabel>Employee Count</InputLabel>
             <Select
               value={companyFormData.employeeCount}
               onChange={handleCompanyInputChange('employeeCount')}
               label="Employee Count"
-              disabled={isLoadingCompanyData}
             >
               {employeeCountOptions.map((count) => (
                 <MenuItem key={count} value={count}>
@@ -1321,6 +853,7 @@ const Page = () => {
               <FormHelperText>{companyErrors.employeeCount}</FormHelperText>
             )}
           </FormControl>
+
           <TextField
             fullWidth
             label="Company URL"
@@ -1330,15 +863,27 @@ const Page = () => {
             helperText={companyErrors.companyURL}
             required
             placeholder="https://example.com"
-            disabled={isLoadingCompanyData}
+          />
+
+          <TextField
+            fullWidth
+            label="Company Address"
+            value={companyFormData.companyAddress}
+            onChange={handleCompanyInputChange('companyAddress')}
+            error={Boolean(companyErrors.companyAddress)}
+            helperText={companyErrors.companyAddress}
+            required
+            multiline
+            rows={2}
+            sx={{ gridColumn: { md: 'span 2' } }}
           />
         </Box>
       </Card>
     </Box>
   );
 
-  // Show loading screen while initializing or loading edit data
-  if (!isInitialized || isLoadingEditData) {
+  // Show loading screen while initializing
+  if (!isInitialized) {
     return (
       <Box
         sx={{
@@ -1352,7 +897,7 @@ const Page = () => {
       >
         <CircularProgress size={40} />
         <Typography variant="body1" sx={{ mt: 2 }}>
-          {isLoadingEditData ? 'Loading owner data...' : 'Initializing...'}
+          Initializing...
         </Typography>
       </Box>
     );
@@ -1368,7 +913,7 @@ const Page = () => {
           <Link color="inherit" href="/dashboard/owners">
             Owner
           </Link>
-          <Typography color="text.primary">{isEdit ? 'Edit' : 'Create'}</Typography>
+          <Typography color="text.primary">Create</Typography>
         </Breadcrumbs>
       </Box>
 
@@ -1404,23 +949,11 @@ const Page = () => {
         {activeStep === steps.length - 1 ? (
           <Button
             onClick={handleFinalSubmit}
-            disabled={isSubmitting || isLoadingCompanyData}
-            endIcon={
-              isSubmitting ? <CircularProgress size={16} /> : isEdit ? <SaveIcon /> : <CheckIcon />
-            }
+            disabled={isSubmitting}
+            endIcon={isSubmitting ? <CircularProgress size={16} /> : <CheckIcon />}
             variant="contained"
           >
-            {isSubmitting
-              ? isEdit
-                ? hasExistingCompany
-                  ? 'Updating...'
-                  : 'Creating Company...'
-                : 'Creating Account...'
-              : isEdit
-                ? hasExistingCompany
-                  ? 'Update Account'
-                  : 'Create Company & Update Owner'
-                : 'Create Account'}
+            {isSubmitting ? 'Creating Account...' : 'Create Account'}
           </Button>
         ) : (
           <Button onClick={handleNext} variant="contained" disabled={isContinueDisabled()}>

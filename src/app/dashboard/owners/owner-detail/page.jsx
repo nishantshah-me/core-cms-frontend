@@ -118,7 +118,7 @@ const OwnerDetailPage = () => {
 
     // Navigate to company management page for editing
     router.push(
-      `/dashboard/company-management?owner_id=${ownerData.id}&company_id=${company.company_id || company.id}`
+      `/dashboard/owners/company-management?owner_id=${ownerData.id}&company_id=${company.company_id || company.id}`
     );
   };
 
@@ -127,7 +127,7 @@ const OwnerDetailPage = () => {
     if (!ownerData) return;
 
     // Navigate to company management page for creating new company
-    router.push(`/dashboard/company-management?owner_id=${ownerData.id}`);
+    router.push(`/dashboard/owners/company-management?owner_id=${ownerData.id}`);
   };
 
   // Updated: Handle Edit Owner button
@@ -136,7 +136,7 @@ const OwnerDetailPage = () => {
 
     try {
       // Navigate to owner management page in edit mode
-      router.push(`/dashboard/owner-management?owner_id=${ownerData.id}`);
+      router.push(`/dashboard/owners/owner-management?owner_id=${ownerData.id}`);
     } catch (error_) {
       console.error('Error preparing edit data:', error_);
       toast.error('Failed to prepare edit data');
@@ -360,7 +360,7 @@ const OwnerDetailPage = () => {
           </Typography>
         </Box>
 
-        <CardContent sx={{ p: 4 }}>
+        <CardContent sx={{ p: 3 }}>
           <Grid container spacing={2} sx={{ display: 'flex' }}>
             <Grid item xs={12} md={4} sx={{ flexGrow: 1 }}>
               <StatCard
@@ -421,7 +421,7 @@ const OwnerDetailPage = () => {
           </Typography>
         </Box>
 
-        <CardContent sx={{ p: 4 }}>
+        <CardContent sx={{ p: 3 }}>
           {hasCompanies ? (
             <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
               <Table aria-label="companies table">
@@ -503,7 +503,6 @@ const OwnerDetailPage = () => {
             </Typography>
             <Button
               variant="outlined"
-              onClick={handleAddCompany}
               startIcon={<EditIcon />}
               sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
             >
@@ -514,7 +513,7 @@ const OwnerDetailPage = () => {
             Billing details and subscription information
           </Typography>
         </Box>
-        <CardContent sx={{ p: 4 }}>
+        <CardContent sx={{ p: 3 }}>
           {!hasCompanies ? (
             <Box sx={{ textAlign: 'center', py: 6 }}>
               <BillingIcon sx={{ fontSize: 48, color: '#cbd5e1', mb: 2 }} />
@@ -526,7 +525,6 @@ const OwnerDetailPage = () => {
               </Typography>
               <Button
                 variant="outlined"
-                onClick={handleAddCompany}
                 startIcon={<AddIcon />}
                 sx={{
                   borderRadius: 2,
@@ -543,7 +541,7 @@ const OwnerDetailPage = () => {
                 <StatCard
                   icon={TeamIcon}
                   label="Total Active Employees"
-                  value="346"
+                  value={ownerData?.totalEmployeeCount || 0}
                   sx={{ height: '100%', border: '1px solid #e2e8f0' }}
                 />
               </Grid>

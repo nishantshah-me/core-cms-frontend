@@ -197,46 +197,12 @@ const Page = () => {
       const ownerId = owner.id;
       const companyId = owner.ownerData?.companies?.[0]?.id || null;
       router.push(
-        `/dashboard/owner-detail?owner_id=${ownerId}${companyId ? `&company_id=${companyId}` : ''}`
+        `/dashboard/owners/owner-detail?owner_id=${ownerId}${companyId ? `&company_id=${companyId}` : ''}`
       );
     } catch (error_) {
       console.error('Error navigating to owner details:', error_);
       toast.error('Failed to load owner details');
     }
-  };
-
-  const handleEdit = () => {
-    if (selectedOwner) {
-      localStorage.removeItem('edit_owner_data');
-      localStorage.removeItem('active_step');
-      localStorage.removeItem('created_owner_id');
-
-      const editData = {
-        isEdit: true,
-        owner: {
-          id: selectedOwner.id,
-          username: selectedOwner.name,
-          firstName: selectedOwner.firstName,
-          lastName: selectedOwner.lastName,
-          email: selectedOwner.email,
-          phone: selectedOwner.phone,
-        },
-        company: {
-          id: selectedOwner.companyId,
-          name: selectedOwner.companyData?.name || '',
-          website: selectedOwner.companyData?.website || '',
-          email: selectedOwner.companyData?.email || selectedOwner.email,
-          phone: selectedOwner.companyData?.phone || '',
-          office_address: selectedOwner.companyData?.office_address || '',
-          industry_type: selectedOwner.companyData?.industry_type || '',
-          employee_count: selectedOwner.companyData?.employee_count || '',
-        },
-      };
-
-      localStorage.setItem('edit_owner_data', JSON.stringify(editData));
-      router.push(`/dashboard/owners/create-owners?edit=${selectedOwner.id}`);
-    }
-    handleMenuClose();
   };
 
   const handleDeleteSingle = async () => {
@@ -273,7 +239,7 @@ const Page = () => {
     localStorage.removeItem('edit_owner_data');
     localStorage.removeItem('active_step');
     localStorage.removeItem('created_owner_id');
-    router.push('/dashboard/owners/create-owners');
+    router.push('/dashboard/owners/create-owner');
   };
 
   const handleChangePage = (event, newPage) => {
@@ -558,11 +524,6 @@ const Page = () => {
           <MenuItem onClick={handleViewDetails}>
             <VisibilityIcon fontSize="small" sx={{ mr: 1 }} />
             View
-          </MenuItem>
-
-          <MenuItem onClick={handleEdit}>
-            <EditIcon fontSize="small" sx={{ mr: 1 }} />
-            Edit
           </MenuItem>
 
           <MenuItem

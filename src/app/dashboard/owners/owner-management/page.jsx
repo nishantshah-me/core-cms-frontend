@@ -11,45 +11,55 @@ import {
   Breadcrumbs,
   Link,
   TextField,
-  Chip,
-  Paper,
   Alert,
   CircularProgress,
   Grid,
+  Chip,
+  Paper,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
   Check as CheckIcon,
   Save as SaveIcon,
 } from '@mui/icons-material';
-import toast from 'react-hot-toast';
 import {
   sendOwnerOTP,
   verifyOwnerOTP,
   updateOwnerUsernameOnly,
   getOwnerById,
 } from 'src/auth/services/ownerCompanyService';
+import toast from 'react-hot-toast';
 
 const OwnerManagementPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const ownerId = searchParams.get('owner_id');
+  const ownerId = searchParams?.get('owner_id');
 
   // State management
-  const [ownerFormData, setOwnerFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-  });
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [ownerData, setOwnerData] = useState(null);
+
+  // Store original values for change detection
   const [originalOwnerData, setOriginalOwnerData] = useState({
     fullName: '',
     email: '',
     phone: '',
   });
+
+  // Owner state
+  const [ownerFormData, setOwnerFormData] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+  });
   const [ownerErrors, setOwnerErrors] = useState({});
+
+  // Enhanced OTP states
   const [otpState, setOtpState] = useState({
-    isEmailVerified: true, // Assume verified initially in edit mode
-    isPhoneVerified: true,
+    isEmailVerified: false,
+    isPhoneVerified: false,
     otpSent: false,
     emailOtp: ['', '', '', '', '', ''],
     phoneOtp: ['', '', '', '', '', ''],
@@ -60,48 +70,63 @@ const OwnerManagementPage = () => {
     needsEmailVerification: false,
     needsPhoneVerification: false,
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch owner data on mount
-  useEffect(() => {
-    async function loadOwnerData() {
-      if (!ownerId) {
-        setError('No owner specified');
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError('');
-        const ownerData = await getOwnerById(ownerId);
-
-        if (!ownerData) {
-          throw new Error('Owner not found');
-        }
-
-        const ownerFormValues = {
-          fullName: ownerData.name || '',
-          email: ownerData.email || '',
-          phone: ownerData.phone || '',
-        };
-
-        setOwnerFormData(ownerFormValues);
-        setOriginalOwnerData(ownerFormValues);
-      } catch (err) {
-        console.error('Error loading owner data:', err);
-        toast.error(`Error loading owner data: ${err.message}`);
-        setError(err.message || 'Failed to load owner data');
-        router.push('/dashboard/owners');
-      } finally {
-        setLoading(false);
-      }
+  // Load owner data
+  const loadOwnerData = async () => {
+    if (!ownerId) {
+      setError('Owner ID is required');
+      setLoading(false);
+      return;
     }
 
+    try {
+      setLoading(true);
+      setError('');
+
+      const owner = await getOwnerById(ownerId);
+
+      if (!owner) {
+        throw new Error('Owner not found');
+      }
+
+      setOwnerData(owner);
+
+      // Populate form data
+      const formValues = {
+        fullName: owner.name || '',
+        email: owner.email || '',
+        phone: owner.phone || '',
+      };
+
+      setOwnerFormData(formValues);
+      setOriginalOwnerData(formValues);
+
+      // Set initial verification status (true since we're editing existing data)
+      setOtpState((prev) => ({
+        ...prev,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+      }));
+    } catch (err) {
+      console.error('Error loading owner data:', err);
+      setError(err.message || 'Failed to load owner data');
+      toast.error('Failed to load owner data');
+
+      // Redirect back if owner not found
+      if (err.code === 'NOT_FOUND' || err.message.includes('not found')) {
+        setTimeout(() => {
+          router.push('/dashboard/owners');
+        }, 2000);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load data on component mount
+  useEffect(() => {
     loadOwnerData();
-  }, [ownerId, router]);
+  }, [ownerId]);
 
   // OTP timer effect
   useEffect(() => {
@@ -118,13 +143,15 @@ const OwnerManagementPage = () => {
   }, [otpState.resendTimer]);
 
   // Helper function to detect field changes
-  const getChangedFields = () => ({
-    email: originalOwnerData.email !== ownerFormData.email,
-    phone: originalOwnerData.phone !== ownerFormData.phone,
-    username: originalOwnerData.fullName !== ownerFormData.fullName,
-  });
+  const getChangedFields = () => {
+    return {
+      email: originalOwnerData.email !== ownerFormData.email,
+      phone: originalOwnerData.phone !== ownerFormData.phone,
+      username: originalOwnerData.fullName !== ownerFormData.fullName,
+    };
+  };
 
-  // Handle input changes
+  // Handle form input changes
   const handleOwnerInputChange = (field) => (event) => {
     const value = event.target.value;
     setOwnerFormData((prev) => ({
@@ -132,7 +159,23 @@ const OwnerManagementPage = () => {
       [field]: value,
     }));
 
-    const changedFields = getChangedFields();
+    // Enhanced change detection
+    const changedFields = {
+      email:
+        field === 'email'
+          ? originalOwnerData.email !== value
+          : originalOwnerData.email !== ownerFormData.email,
+      phone:
+        field === 'phone'
+          ? originalOwnerData.phone !== value
+          : originalOwnerData.phone !== ownerFormData.phone,
+      username:
+        field === 'fullName'
+          ? originalOwnerData.fullName !== value
+          : originalOwnerData.fullName !== ownerFormData.fullName,
+    };
+
+    // Reset verification status if email or phone changes
     if ((field === 'email' && changedFields.email) || (field === 'phone' && changedFields.phone)) {
       setOtpState((prev) => ({
         ...prev,
@@ -145,6 +188,7 @@ const OwnerManagementPage = () => {
       }));
     }
 
+    // Clear field error
     if (ownerErrors[field]) {
       setOwnerErrors((prev) => ({
         ...prev,
@@ -152,6 +196,7 @@ const OwnerManagementPage = () => {
       }));
     }
 
+    // Clear general error
     if (error) {
       setError('');
     }
@@ -161,6 +206,7 @@ const OwnerManagementPage = () => {
   const handleSendOTP = async () => {
     const changedFields = getChangedFields();
 
+    // Validation
     if (!ownerFormData.email || !/\S+@\S+\.\S+/.test(ownerFormData.email)) {
       setOwnerErrors((prev) => ({ ...prev, email: 'Please enter a valid email address' }));
       return;
@@ -176,8 +222,9 @@ const OwnerManagementPage = () => {
       return;
     }
 
+    // Check if OTP is actually needed
     if (!changedFields.email && !changedFields.phone) {
-      toast.info('No changes detected in email or phone number');
+      toast('No changes detected in email or phone number', { icon: 'ℹ️' });
       return;
     }
 
@@ -185,18 +232,27 @@ const OwnerManagementPage = () => {
     setError('');
 
     try {
-      const otpData = { owner_id: ownerId };
-      if (changedFields.email) otpData.email = ownerFormData.email.trim();
-      if (changedFields.phone) otpData.phone = ownerFormData.phone.trim();
-      if (changedFields.username) otpData.username = ownerFormData.fullName.trim();
+      const otpData = {
+        owner_id: ownerData.id,
+      };
+
+      if (changedFields.email) {
+        otpData.email = ownerFormData.email.trim();
+      }
+      if (changedFields.phone) {
+        otpData.phone = ownerFormData.phone.trim();
+      }
+      if (changedFields.username) {
+        otpData.username = ownerFormData.fullName.trim();
+      }
 
       await sendOwnerOTP(otpData);
 
-      toast.success(
-        `OTP sent for verification of changed ${Object.keys(changedFields)
-          .filter((key) => changedFields[key])
-          .join(' and ')}`
-      );
+      const message = `OTP sent for verification of changed ${Object.keys(changedFields)
+        .filter((key) => changedFields[key])
+        .join(' and ')}`;
+
+      toast.success(message);
 
       setOtpState((prev) => ({
         ...prev,
@@ -212,13 +268,17 @@ const OwnerManagementPage = () => {
       console.error('OTP send error:', err);
       toast.error(`OTP send error: ${err.message}`);
       setError(err.message || 'Failed to send OTP. Please try again.');
-      setOtpState((prev) => ({ ...prev, isSending: false }));
+      setOtpState((prev) => ({
+        ...prev,
+        isSending: false,
+      }));
     }
   };
 
-  // Handle OTP input
+  // Handle OTP input changes
   const handleOtpChange = (type, index, value) => {
     if (value.length > 1) return;
+
     const otpKey = type === 'email' ? 'emailOtp' : 'phoneOtp';
     const newOtp = [...otpState[otpKey]];
     newOtp[index] = value;
@@ -235,6 +295,7 @@ const OwnerManagementPage = () => {
     }
   };
 
+  // Handle OTP backspace navigation
   const handleOtpKeyDown = (type, index, event) => {
     const otpKey = type === 'email' ? 'emailOtp' : 'phoneOtp';
     if (event.key === 'Backspace' && !otpState[otpKey][index] && index > 0) {
@@ -249,8 +310,8 @@ const OwnerManagementPage = () => {
     const emailOtpValue = otpState.emailOtp.join('');
     const phoneOtpValue = otpState.phoneOtp.join('');
 
-    const needsEmailOTP = changedFields.email && !otpState.isEmailVerified;
-    const needsPhoneOTP = changedFields.phone && !otpState.isPhoneVerified;
+    const needsEmailOTP = changedFields.email;
+    const needsPhoneOTP = changedFields.phone;
 
     if (needsEmailOTP && emailOtpValue.length !== 6) {
       setOtpState((prev) => ({
@@ -272,7 +333,10 @@ const OwnerManagementPage = () => {
     setError('');
 
     try {
-      const verifyData = { owner_id: ownerId };
+      const verifyData = {
+        owner_id: ownerData.id,
+      };
+
       if (needsEmailOTP) {
         verifyData.email = ownerFormData.email.trim();
         verifyData.email_otp = emailOtpValue;
@@ -286,6 +350,7 @@ const OwnerManagementPage = () => {
       }
 
       await verifyOwnerOTP(verifyData);
+
       toast.success('Owner information updated and verified successfully');
 
       setOtpState((prev) => ({
@@ -294,8 +359,8 @@ const OwnerManagementPage = () => {
         isPhoneVerified: true,
         isVerifying: false,
       }));
+
       setOriginalOwnerData({ ...ownerFormData });
-      router.push(`/dashboard/owner-detail?owner_id=${ownerId}`);
     } catch (err) {
       console.error('OTP verification error:', err);
       toast.error(`OTP verification error: ${err.message}`);
@@ -315,7 +380,7 @@ const OwnerManagementPage = () => {
   };
 
   // Validate form
-  const validateOwnerForm = () => {
+  const validateForm = () => {
     const newErrors = {};
     const changedFields = getChangedFields();
 
@@ -333,6 +398,7 @@ const OwnerManagementPage = () => {
       newErrors.phone = 'Phone number is required';
     }
 
+    // Check verification status for changed fields
     if (changedFields.email && !otpState.isEmailVerified) {
       newErrors.email = 'Please verify your new email address';
     }
@@ -346,14 +412,7 @@ const OwnerManagementPage = () => {
 
   // Handle form submission
   const handleSubmit = async () => {
-    if (!validateOwnerForm()) {
-      return;
-    }
-
-    const changedFields = getChangedFields();
-    if (!changedFields.username && !changedFields.email && !changedFields.phone) {
-      toast.info('No changes detected');
-      router.push(`/dashboard/owner-detail?owner_id=${ownerId}`);
+    if (!validateForm()) {
       return;
     }
 
@@ -361,22 +420,38 @@ const OwnerManagementPage = () => {
     setError('');
 
     try {
-      if (changedFields.username && !changedFields.email && !changedFields.phone) {
-        await updateOwnerUsernameOnly({
-          owner_id: ownerId,
-          username: ownerFormData.fullName.trim(),
-        });
-        toast.success('Owner name updated successfully');
-        setOriginalOwnerData({ ...ownerFormData });
-        router.push(`/dashboard/owner-detail?owner_id=${ownerId}`);
-      } else if (changedFields.email || changedFields.phone) {
-        if (!otpState.isEmailVerified || !otpState.isPhoneVerified) {
-          toast.error('Please verify the changed email/phone with OTP before continuing');
-        } else {
-          toast.success('Owner information updated successfully');
-          router.push(`/dashboard/owner-detail?owner_id=${ownerId}`);
-        }
+      const changedFields = getChangedFields();
+
+      if (!changedFields.username && !changedFields.email && !changedFields.phone) {
+        router.push(`/dashboard/owners/owner-detail?owner_id=${ownerId}`);
       }
+
+      // If only username changed, use the simpler endpoint
+      if (changedFields.username && !changedFields.email && !changedFields.phone) {
+        const ownerUpdateData = {
+          owner_id: ownerData.id,
+          username: ownerFormData.fullName.trim(),
+        };
+
+        await updateOwnerUsernameOnly(ownerUpdateData);
+        toast.success('Owner name updated successfully');
+      } else if (changedFields.email || changedFields.phone) {
+        // For email/phone changes, ensure they're verified
+        if (!otpState.isEmailVerified || !otpState.isPhoneVerified) {
+          toast.error('Please verify the changed email/phone with OTP before saving');
+          setIsSubmitting(false);
+          return;
+        }
+        toast.success('Owner information updated successfully');
+      }
+
+      // Update original data
+      setOriginalOwnerData({ ...ownerFormData });
+
+      // Navigate back to owner detail page
+      setTimeout(() => {
+        router.push(`/dashboard/owners/owner-detail?owner_id=${ownerId}`);
+      }, 1000);
     } catch (err) {
       console.error('Error updating owner:', err);
       toast.error(`Error updating owner: ${err.message || err}`);
@@ -386,13 +461,50 @@ const OwnerManagementPage = () => {
     }
   };
 
+  // Handle back navigation
+  const handleBack = () => {
+    router.push(`/dashboard/owners/owner-detail?owner_id=${ownerId}`);
+  };
+
+  // Check if continue is disabled
+  const isContinueDisabled = () => {
+    const changedFields = getChangedFields();
+
+    if (
+      !ownerFormData.fullName.trim() ||
+      !ownerFormData.email.trim() ||
+      !ownerFormData.phone.trim()
+    ) {
+      return true;
+    }
+
+    if (changedFields.email && !otpState.isEmailVerified) return true;
+    if (changedFields.phone && !otpState.isPhoneVerified) return true;
+    return false;
+  };
+
+  // Should show OTP
+  const shouldShowOTP = () => {
+    const changedFields = getChangedFields();
+    return changedFields.email || changedFields.phone;
+  };
+
+  // Should show send OTP button
+  const shouldShowSendOTPButton = () => {
+    const changedFields = getChangedFields();
+    const hasRelevantChanges = changedFields.email || changedFields.phone;
+    return hasRelevantChanges && !otpState.otpSent;
+  };
+
   // Render OTP section
   const renderOTPSection = () => {
+    if (!shouldShowOTP() || !otpState.otpSent) return null;
+
     const changedFields = getChangedFields();
     const needsEmailOTP = changedFields.email && !otpState.isEmailVerified;
     const needsPhoneOTP = changedFields.phone && !otpState.isPhoneVerified;
 
-    if (!otpState.otpSent || (!needsEmailOTP && !needsPhoneOTP)) return null;
+    if (!needsEmailOTP && !needsPhoneOTP) return null;
 
     return (
       <Box sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }}>
@@ -539,11 +651,7 @@ const OwnerManagementPage = () => {
     );
   };
 
-  // Handle back navigation
-  const handleBack = () => {
-    router.push(`/dashboard/owner-detail?owner_id=${ownerId}`);
-  };
-
+  // Loading state
   if (loading) {
     return (
       <Box
@@ -553,7 +661,6 @@ const OwnerManagementPage = () => {
           justifyContent: 'center',
           alignItems: 'center',
           height: '80vh',
-          width: '100%',
         }}
       >
         <CircularProgress size={40} />
@@ -564,238 +671,202 @@ const OwnerManagementPage = () => {
     );
   }
 
-  if (error) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Box sx={{ mb: 4 }}>
-          <Breadcrumbs>
-            <Link color="inherit" href="/dashboard">
-              Dashboard
-            </Link>
-            <Link
-              component="button"
-              color="inherit"
-              onClick={handleBack}
-              sx={{ cursor: 'pointer' }}
-            >
-              Owners
-            </Link>
-            <Typography color="text.primary">Edit Owner</Typography>
-          </Breadcrumbs>
-        </Box>
-        <Card
-          sx={{
-            textAlign: 'center',
-            py: 8,
-            px: 4,
-            borderRadius: 4,
-            border: '2px dashed #e0e0e0',
-            backgroundColor: '#fafafa',
-          }}
-        >
-          <WarningIcon sx={{ fontSize: 64, color: '#ffc107', mb: 2 }} />
-          <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, color: '#424242' }}>
-            Error
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-            {error}
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<ArrowBackIcon />}
-            onClick={handleBack}
-            sx={{ minWidth: 200 }}
-          >
-            Go Back to Owner Details
-          </Button>
-        </Card>
-      </Container>
-    );
-  }
-
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* Breadcrumbs */}
       <Box sx={{ mb: 4 }}>
         <Breadcrumbs>
           <Link color="inherit" href="/dashboard">
             Dashboard
           </Link>
-          <Link component="button" color="inherit" onClick={handleBack} sx={{ cursor: 'pointer' }}>
+          <Link color="inherit" href="/dashboard/owners">
             Owners
+          </Link>
+          <Link component="button" color="inherit" onClick={handleBack} sx={{ cursor: 'pointer' }}>
+            Owner Detail
           </Link>
           <Typography color="text.primary">Edit Owner</Typography>
         </Breadcrumbs>
       </Box>
 
+      {/* Header */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, color: '#1a1a1a', mb: 1 }}>
+          Edit Owner
+        </Typography>
+        <Typography variant="h6" color="#666" sx={{ fontWeight: 400 }}>
+          Update owner information and verify changes with OTP
+        </Typography>
+      </Box>
+
+      {/* Error Alert */}
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
         </Alert>
       )}
 
-      <Box>
-        <Card sx={{ p: 3 }}>
-          <Typography variant="h6" sx={{ mb: 3 }}>
-            Edit Owner Information
-          </Typography>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)' },
-              gap: 2,
-            }}
-          >
+      {/* Owner Form */}
+      <Card sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 3 }}>
+          Owner Information
+        </Typography>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)' },
+            gap: 2,
+          }}
+        >
+          <TextField
+            fullWidth
+            label="Full Name"
+            value={ownerFormData.fullName}
+            onChange={handleOwnerInputChange('fullName')}
+            error={Boolean(ownerErrors.fullName)}
+            helperText={ownerErrors.fullName}
+            required
+          />
+
+          <Box sx={{ position: 'relative' }}>
             <TextField
               fullWidth
-              label="Full Name"
-              value={ownerFormData.fullName}
-              onChange={handleOwnerInputChange('fullName')}
-              error={Boolean(ownerErrors.fullName)}
-              helperText={ownerErrors.fullName}
+              label="Mobile Number"
+              value={ownerFormData.phone}
+              onChange={handleOwnerInputChange('phone')}
+              error={Boolean(ownerErrors.phone)}
+              helperText={ownerErrors.phone}
               required
+              sx={{
+                '& .MuiInputBase-root': {
+                  paddingRight:
+                    otpState.isPhoneVerified && !getChangedFields().phone ? '120px' : 'inherit',
+                },
+              }}
             />
-            <Box sx={{ position: 'relative' }}>
-              <TextField
-                fullWidth
-                label="Mobile Number"
-                value={ownerFormData.phone}
-                onChange={handleOwnerInputChange('phone')}
-                error={Boolean(ownerErrors.phone)}
-                helperText={ownerErrors.phone}
-                required
-                disabled={otpState.isPhoneVerified && !getChangedFields().phone}
-                sx={{
-                  '& .MuiInputBase-root': {
-                    paddingRight:
-                      otpState.isPhoneVerified && !getChangedFields().phone ? '120px' : 'inherit',
-                  },
-                }}
-              />
-              {otpState.isPhoneVerified && !getChangedFields().phone && (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    right: 8,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 1,
-                  }}
-                >
-                  <Chip
-                    label="Verified"
-                    color="success"
-                    size="small"
-                    icon={<CheckIcon />}
-                    sx={{ fontWeight: 'medium' }}
-                  />
-                </Box>
-              )}
-            </Box>
-            <Box sx={{ position: 'relative' }}>
-              <TextField
-                fullWidth
-                label="Working Email"
-                type="email"
-                value={ownerFormData.email}
-                onChange={handleOwnerInputChange('email')}
-                error={Boolean(ownerErrors.email)}
-                helperText={ownerErrors.email}
-                required
-                disabled={otpState.isEmailVerified && !getChangedFields().email}
-                sx={{
-                  '& .MuiInputBase-root': {
-                    paddingRight:
-                      otpState.isEmailVerified && !getChangedFields().email ? '120px' : 'inherit',
-                  },
-                }}
-              />
-              {otpState.isEmailVerified && !getChangedFields().email && (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    right: 8,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 1,
-                  }}
-                >
-                  <Chip
-                    label="Verified"
-                    color="success"
-                    size="small"
-                    icon={<CheckIcon />}
-                    sx={{ fontWeight: 'medium' }}
-                  />
-                </Box>
-              )}
-            </Box>
-            {getChangedFields().email || getChangedFields().phone ? (
+            {otpState.isPhoneVerified && !getChangedFields().phone && (
               <Box
                 sx={{
-                  gridColumn: { xs: 'span 1', md: 'span 2' },
-                  display: 'flex',
-                  justifyContent: 'center',
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 1,
                 }}
               >
-                <Button
-                  variant="contained"
-                  onClick={handleSendOTP}
-                  disabled={
-                    otpState.isSending ||
-                    !ownerFormData.email ||
-                    !ownerFormData.phone ||
-                    !ownerFormData.fullName ||
-                    otpState.otpSent
-                  }
-                  sx={{
-                    minWidth: '200px',
-                    height: '48px',
-                    fontSize: '1rem',
-                    fontWeight: 'medium',
-                    textTransform: 'none',
-                    borderRadius: '8px',
-                  }}
-                >
-                  {otpState.isSending ? (
-                    <>
-                      <CircularProgress size={20} sx={{ mr: 1 }} />
-                      Sending OTP...
-                    </>
-                  ) : (
-                    'Send Verification Code'
-                  )}
-                </Button>
+                <Chip
+                  label="Verified"
+                  color="success"
+                  size="small"
+                  icon={<CheckIcon />}
+                  sx={{ fontWeight: 'medium' }}
+                />
               </Box>
-            ) : null}
-            {renderOTPSection()}
-            <Box sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }}>
-              <Alert severity="info" sx={{ mt: 2 }}>
-                You are editing existing owner information.
-                <br />
-                <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
-                  Note: If you change email or phone number, you will need to verify them with OTP.
-                </Typography>
-              </Alert>
-            </Box>
+            )}
           </Box>
-        </Card>
-      </Box>
 
+          <Box sx={{ position: 'relative' }}>
+            <TextField
+              fullWidth
+              label="Working Email"
+              type="email"
+              value={ownerFormData.email}
+              onChange={handleOwnerInputChange('email')}
+              error={Boolean(ownerErrors.email)}
+              helperText={ownerErrors.email}
+              required
+              sx={{
+                '& .MuiInputBase-root': {
+                  paddingRight:
+                    otpState.isEmailVerified && !getChangedFields().email ? '120px' : 'inherit',
+                },
+              }}
+            />
+            {otpState.isEmailVerified && !getChangedFields().email && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 1,
+                }}
+              >
+                <Chip
+                  label="Verified"
+                  color="success"
+                  size="small"
+                  icon={<CheckIcon />}
+                  sx={{ fontWeight: 'medium' }}
+                />
+              </Box>
+            )}
+          </Box>
+
+          {shouldShowSendOTPButton() && (
+            <Box
+              sx={{
+                gridColumn: { xs: 'span 1', md: 'span 2' },
+                display: 'flex',
+                justifyContent: 'center',
+              }}
+            >
+              <Button
+                variant="contained"
+                onClick={handleSendOTP}
+                disabled={
+                  otpState.isSending ||
+                  !ownerFormData.email ||
+                  !ownerFormData.phone ||
+                  !ownerFormData.fullName
+                }
+                sx={{
+                  minWidth: '200px',
+                  height: '48px',
+                  fontSize: '1rem',
+                  fontWeight: 'medium',
+                  textTransform: 'none',
+                  borderRadius: '8px',
+                }}
+              >
+                {otpState.isSending ? (
+                  <>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    Sending OTP...
+                  </>
+                ) : (
+                  'Send Verification Code'
+                )}
+              </Button>
+            </Box>
+          )}
+
+          {renderOTPSection()}
+
+          <Box sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }}>
+            <Alert severity="info" sx={{ mt: 2 }}>
+              You are editing existing owner information.
+              <br />
+              <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
+                Note: If you change email or phone number, you will need to verify them with OTP.
+              </Typography>
+            </Alert>
+          </Box>
+        </Box>
+      </Card>
+
+      {/* Action Buttons */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-        <Button
-          variant="outlined"
-          onClick={handleBack}
-          startIcon={<ArrowBackIcon />}
-          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
-        >
-          Back
+        <Button onClick={handleBack} startIcon={<ArrowBackIcon />} variant="outlined" size="medium">
+          Back to Owner Detail
         </Button>
+
         <Button
-          variant="contained"
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || isContinueDisabled()}
           endIcon={isSubmitting ? <CircularProgress size={16} /> : <SaveIcon />}
-          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+          variant="contained"
+          size="medium"
         >
           {isSubmitting ? 'Updating...' : 'Update Owner'}
         </Button>
