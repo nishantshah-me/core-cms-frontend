@@ -44,6 +44,7 @@ import {
   Groups as TeamIcon,
   Add as AddIcon,
   MoreVert as MoreVertIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 
 import { CustomPopover } from 'src/components/custom-popover';
@@ -57,6 +58,7 @@ const OwnerDetailPage = () => {
   const companyIdParam = searchParams?.get('company_id');
 
   const [ownerData, setOwnerData] = useState(null);
+  const [totalActiveEmployees, setTotalActiveEmployees] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -79,6 +81,8 @@ const OwnerDetailPage = () => {
 
         // Ensure companies are available as a list in ownerData
         const companies = fetched.ownerData?.companies || [];
+        const activeEmployees = fetched.ownerData?.total_no_of_employees;
+        setTotalActiveEmployees(activeEmployees);
 
         // If a company_id was provided, find the matching company.
         let selectedCompanyData = null;
@@ -119,6 +123,26 @@ const OwnerDetailPage = () => {
     // Navigate to company management page for editing
     router.push(
       `/dashboard/owners/company-management?owner_id=${ownerData.id}&company_id=${company.company_id || company.id}`
+    );
+  };
+
+  const handleViewDetails = (company) => {
+    if (!ownerData || !company) return;
+
+    // Close the popover
+    handleMenuClose();
+
+    // Navigate to company management page for editing
+    router.push(
+      `/dashboard/owners/company-detail?owner_id=${ownerData.id}&company_id=${company.company_id || company.id}`
+    );
+  };
+
+  const handleRowClick = (company) => {
+    if (!ownerData || !company) return;
+
+    router.push(
+      `/dashboard/owners/company-detail?owner_id=${ownerData.id}&company_id=${company.company_id || company.id}`
     );
   };
 
@@ -440,11 +464,18 @@ const OwnerDetailPage = () => {
                   {ownerData.companies.map((company, index) => (
                     <TableRow
                       key={index}
-                      sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                      sx={{
+                        '&:last-child td, &:last-child th': { border: 0 },
+                        cursor: 'pointer',
+                        '&:hover': {
+                          backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                        },
+                      }}
+                      onClick={() => handleRowClick(company)}
                     >
                       <TableCell>{company.name}</TableCell>
                       <TableCell>{company.industry_type || 'N/A'}</TableCell>
-                      <TableCell>{company.employees_count}</TableCell>
+                      <TableCell>{company.no_of_employees || 'N/A'}</TableCell>
                       <TableCell>
                         <Link href={`mailto:${company.email}`} underline="none" color="primary">
                           {company.email}
@@ -541,7 +572,7 @@ const OwnerDetailPage = () => {
                 <StatCard
                   icon={TeamIcon}
                   label="Total Active Employees"
-                  value={ownerData?.totalEmployeeCount || 0}
+                  value={totalActiveEmployees || 0}
                   sx={{ height: '100%', border: '1px solid #e2e8f0' }}
                 />
               </Grid>
@@ -587,6 +618,10 @@ const OwnerDetailPage = () => {
         }}
       >
         <MenuList>
+          <MenuItem onClick={() => handleViewDetails(selectedCompany)}>
+            <VisibilityIcon fontSize="small" sx={{ mr: 1 }} />
+            View
+          </MenuItem>
           <MenuItem onClick={() => handleEdit(selectedCompany)}>
             <EditIcon fontSize="small" sx={{ mr: 1 }} />
             Edit
