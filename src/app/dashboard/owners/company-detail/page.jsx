@@ -27,31 +27,15 @@ import {
   CircularProgress,
 } from '@mui/material';
 import {
-  Email as EmailIcon,
-  Phone as PhoneIcon,
-  Business as BusinessIcon,
-  LocationOn as LocationIcon,
-  Language as WebsiteIcon,
   People as PeopleIcon,
   Person as PersonIcon,
-  Factory as FactoryIcon,
   ArrowBack as ArrowBackIcon,
-  Edit as EditIcon,
-  AccountBalance as BillingIcon,
   TrendingUp as RevenueIcon,
-  Groups as TeamIcon,
-  Add as AddIcon,
   MoreVert as MoreVertIcon,
   Visibility as VisibilityIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
-  AccessTime as AccessTimeIcon,
-  Timeline as TimelineIcon,
-  Assessment as AssessmentIcon,
-  School as SchoolIcon,
-  Work as WorkIcon,
   Settings as SettingsIcon,
-  Event as EventIcon,
 } from '@mui/icons-material';
 import { getOwnerById } from 'src/auth/services/ownerCompanyService';
 
@@ -61,7 +45,7 @@ const CompanyDetailPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const ownerId = searchParams?.get('owner_id');
-  const companyId = searchParams?.get('company_id');
+  const companyId = Number(searchParams?.get('company_id'));
 
   // State for the module actions menu
   const [anchorEl, setAnchorEl] = useState(null);
@@ -79,7 +63,7 @@ const CompanyDetailPage = () => {
       }
       try {
         const data = await getOwnerById(ownerId);
-        setOwnerData(data);
+        setOwnerData(data.ownerData);
       } catch (err) {
         console.error('Error fetching owner data:', err);
         setError('Failed to load company details');
@@ -90,7 +74,7 @@ const CompanyDetailPage = () => {
     fetchData();
   }, [ownerId]);
 
-  // Mock data - replace with actual API data later
+  // Mock data
   const mockCompanyData = {
     id: 'TC-2025-001',
     company_id: 2, // from API
@@ -177,6 +161,10 @@ const CompanyDetailPage = () => {
       paymentStatus: 'Current',
     },
   };
+
+  const companies = ownerData?.companies;
+
+  const selectedCompany = companies?.find((company) => company.company_id === companyId);
 
   const handleBackToOwner = () => {
     router.push(`/dashboard/owners/owner-detail?owner_id=${ownerId}`);
@@ -340,9 +328,6 @@ const CompanyDetailPage = () => {
     return <EmptyState />;
   }
 
-  console.log(ownerData);
-  console.log('ownerData');
-
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* BreadCrumbs */}
@@ -386,7 +371,6 @@ const CompanyDetailPage = () => {
       </Box>
 
       {/* Quick Stats */}
-
       <Grid container spacing={2} sx={{ display: 'flex', mb: 4 }}>
         <Grid item xs={12} md={3} sx={{ flexGrow: 1 }}>
           <StatCard
@@ -422,9 +406,8 @@ const CompanyDetailPage = () => {
         </Grid>
       </Grid>
 
-      {/* Company + owner */}
-
-      {/* <Grid container spacing={2} sx={{ display: 'flex', mb: 4 }}>
+      {/* Company + Owner */}
+      <Grid container spacing={2} sx={{ display: 'flex', mb: 4 }}>
         <Grid item xs={12} md={3} sx={{ flexGrow: 1 }}>
           <Card
             sx={{
@@ -460,7 +443,7 @@ const CompanyDetailPage = () => {
                       Registered Name
                     </Typography>
                     <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                      {ownerData.registered_name}
+                      {selectedCompany.name || 'N/A'}
                     </Typography>
                   </Box>
 
@@ -468,14 +451,16 @@ const CompanyDetailPage = () => {
                     <Typography variant="subtitle2" color="#64748b" sx={{ mb: 1 }}>
                       Industry Type
                     </Typography>
-                    <Typography variant="body1">{ownerData.industry_type}</Typography>
+                    <Typography variant="body1">
+                      {selectedCompany.industry_type || 'N/A'}
+                    </Typography>
                   </Box>
 
                   <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="subtitle2" color="#64748b" sx={{ mb: 1 }}>
                       Phone
                     </Typography>
-                    <Typography variant="body1">{ownerData.phone}</Typography>
+                    <Typography variant="body1">{selectedCompany.phone || 'N/A'}</Typography>
                   </Box>
 
                   <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between' }}>
@@ -483,7 +468,7 @@ const CompanyDetailPage = () => {
                       Email
                     </Typography>
                     <Typography variant="body1" color="primary" sx={{ cursor: 'pointer' }}>
-                      {ownerData.email}
+                      {selectedCompany.email || 'N/A'}
                     </Typography>
                   </Box>
 
@@ -492,7 +477,7 @@ const CompanyDetailPage = () => {
                       Website
                     </Typography>
                     <Typography variant="body1" color="primary" sx={{ cursor: 'pointer' }}>
-                      {ownerData.website}
+                      {selectedCompany.website || 'N/A'}
                     </Typography>
                   </Box>
 
@@ -500,28 +485,32 @@ const CompanyDetailPage = () => {
                     <Typography variant="subtitle2" color="#64748b" sx={{ mb: 1 }}>
                       Employee Count
                     </Typography>
-                    <Typography variant="body1">{ownerData.no_of_employees}</Typography>
+                    <Typography variant="body1">
+                      {selectedCompany.no_of_employees || 'N/A'}
+                    </Typography>
                   </Box>
 
                   <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="subtitle2" color="#64748b" sx={{ mb: 1 }}>
                       PAN
                     </Typography>
-                    <Typography variant="body1">{ownerData.pan}</Typography>
+                    <Typography variant="body1">{selectedCompany.pan || 'N/A'}</Typography>
                   </Box>
 
                   <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="subtitle2" color="#64748b" sx={{ mb: 1 }}>
                       GST
                     </Typography>
-                    <Typography variant="body1">{ownerData.gst}</Typography>
+                    <Typography variant="body1">{selectedCompany.gst || 'N/A'}</Typography>
                   </Box>
 
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="subtitle2" color="#64748b" sx={{ mb: 1 }}>
                       Office Address
                     </Typography>
-                    <Typography variant="body1">{ownerData.office_address}</Typography>
+                    <Typography variant="body1">
+                      {selectedCompany.office_address || 'N/A'}
+                    </Typography>
                   </Box>
                 </Grid>
               </Grid>
@@ -563,7 +552,9 @@ const CompanyDetailPage = () => {
                       Full Name
                     </Typography>
                     <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                      {ownerData.owner.name}
+                      {ownerData?.username
+                        ? ownerData.username.charAt(0).toUpperCase() + ownerData.username.slice(1)
+                        : 'N/A'}
                     </Typography>
                   </Box>
                   <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between' }}>
@@ -571,7 +562,7 @@ const CompanyDetailPage = () => {
                       Email Address
                     </Typography>
                     <Typography variant="body1" color="primary" sx={{ cursor: 'pointer' }}>
-                      {ownerData.owner.email}
+                      {ownerData.email}
                     </Typography>
                   </Box>
 
@@ -579,7 +570,7 @@ const CompanyDetailPage = () => {
                     <Typography variant="subtitle2" color="#64748b" sx={{ mb: 1 }}>
                       Phone Number
                     </Typography>
-                    <Typography variant="body1"> {ownerData.owner.phone}</Typography>
+                    <Typography variant="body1">{ownerData?.phone || 'N/A'}</Typography>
                   </Box>
 
                   <Box sx={{ width: '100%' }}>
@@ -597,7 +588,7 @@ const CompanyDetailPage = () => {
             </CardContent>
           </Card>
         </Grid>
-      </Grid> */}
+      </Grid>
 
       {/* Enabled Modules */}
       <Card
@@ -712,13 +703,6 @@ const CompanyDetailPage = () => {
                 Current billing information and payment status
               </Typography>
             </Box>
-            {/* <Button
-              variant="outlined"
-              onClick={handleViewBillingHistory}
-              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
-            >
-              View Billing History
-            </Button> */}
           </Box>
         </Box>
 

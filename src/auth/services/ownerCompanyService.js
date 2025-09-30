@@ -234,7 +234,7 @@ export async function getOwnerById(ownerId) {
       isEmailVerified: owner.is_email_verified || false,
       isPhoneVerified: owner.is_phone_verified || false,
       companyCount: owner.company_count || 0,
-      totalEmployeeCount: owner.total_employee_count || 0,
+      totalEmployeeCount: owner.total_no_of_employees || 0,
       companyId: firstCompany?.company_id ?? firstCompany?.id ?? null,
       companyData: firstCompany
         ? {
