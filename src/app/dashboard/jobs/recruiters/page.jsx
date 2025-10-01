@@ -181,7 +181,7 @@ const JobListView = () => {
         <Tabs
           value={currentTab}
           onChange={handleTabChange}
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
+          sx={{ borderBottom: 1, borderColor: 'divider', p: 2 }}
         >
           <Tab label={`All (${totalCount})`} value="all" />
           <Tab label={`Published (${publishedCount})`} value="published" />
@@ -190,7 +190,7 @@ const JobListView = () => {
       </Card>
 
       <Card>
-        <TableContainer>
+        <TableContainer sx={{ p: 2 }}>
           <Table>
             <TableHead>
               <TableRow>
