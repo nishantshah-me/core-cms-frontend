@@ -88,7 +88,7 @@ export function AuthSplitLayout({ sx, cssVars, children, slotProps, layoutQuery 
         methods={[
           {
             label: 'Jwt',
-            path: paths.auth.jwt.signIn,
+            path: '#',
             icon: `${CONFIG.assetsDir}/assets/icons/platforms/ic-jwt.svg`,
           },
           {
