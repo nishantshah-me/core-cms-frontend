@@ -7,7 +7,7 @@ import Typography from '@mui/material/Typography';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 
-// ----------------------------------------------------------------------
+// --------------------------
 
 export function BlankView({ title = 'Blank', description, sx }) {
   const renderContent = () => (
