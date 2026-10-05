@@ -9,6 +9,7 @@ import { CONFIG } from 'src/global-config';
 import { SplashScreen } from 'src/components/loading-screen';
 
 import { useAuthContext } from '../hooks';
+import { getSafeReturnTo } from '../utils';
 
 // ----------------------------------------------------------------------
 
@@ -18,7 +19,7 @@ export function GuestGuard({ children }) {
 
   const { loading, authenticated } = useAuthContext();
 
-  const returnTo = searchParams.get('returnTo') ?? CONFIG.auth.redirectPath;
+  const returnTo = getSafeReturnTo(searchParams.get('returnTo'), CONFIG.auth.redirectPath);
 
   const [isChecking, setIsChecking] = useState(true);
 

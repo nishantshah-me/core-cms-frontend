@@ -7,6 +7,7 @@ import Button from '@mui/material/Button';
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
+import { useAuthContext } from 'src/auth/hooks';
 import { signOut } from 'src/auth/services/authService';
 
 // ----------------------------------------------------------------------
@@ -14,14 +15,19 @@ import { signOut } from 'src/auth/services/authService';
 export function SignOutButton({ onClose, sx, ...other }) {
   const router = useRouter();
 
-  const handleLogout = useCallback(() => {
+  const { checkUserSession } = useAuthContext();
+
+  const handleLogout = useCallback(async () => {
     signOut();
 
     onClose?.();
 
-    // Redirect to login page
-    router.push('/sign-in');
-  }, [onClose, router]);
+    // Without this the auth context would still say "authenticated" and GuestGuard would bounce
+    // the user straight back off the sign-in page.
+    await checkUserSession();
+
+    router.replace(paths.auth.jwt.signIn);
+  }, [checkUserSession, onClose, router]);
 
   return (
     <Button

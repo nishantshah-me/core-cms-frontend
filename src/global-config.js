@@ -4,10 +4,14 @@ import packageJson from '../package.json';
 
 // ----------------------------------------------------------------------
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://api-dev.hexafoldtech.com';
+
 export const CONFIG = {
   appName: 'Minimal UI',
   appVersion: packageJson.version,
   serverUrl: process.env.NEXT_PUBLIC_SERVER_URL ?? '',
+  /** HRMS backend: back-office login and the owner/company endpoints. */
+  apiUrl: API_URL.replace(/\/+$/, ''),
   assetsDir: process.env.NEXT_PUBLIC_ASSETS_DIR ?? '',
   isStaticExport: JSON.parse(process.env.BUILD_STATIC_EXPORT ?? 'false'),
   /**

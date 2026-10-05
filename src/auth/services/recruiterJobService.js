@@ -36,10 +36,13 @@ export function handleApiError(err) {
 // Build headers
 function getAuthHeaders() {
   if (typeof window === 'undefined') return {};
-  const token = localStorage.getItem('access_token');
+  // TODO: nothing writes this token any more. The Supabase sign-in was replaced by the back-office admin
+  // login, so these requests currently go out with only the anon key. Jobs/Candidates need their own
+  // auth (or a move off Supabase) before they work for RLS-protected tables.
+  const token = localStorage.getItem('supabase_access_token');
   return {
     apikey: SUPABASE_ANON_KEY,
-    Authorization: token ? `Bearer ${token}` : '',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     'Content-Type': 'application/json',
     Prefer: 'return=representation',
   };

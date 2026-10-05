@@ -3,59 +3,68 @@
 import { useSetState } from 'minimal-shared/hooks';
 import { useMemo, useEffect, useCallback } from 'react';
 
-import axios, { endpoints } from 'src/lib/axios';
+import { fetchCurrentAdmin } from 'src/auth/services/authService';
+import { isAuthRejection, refreshSession } from 'src/auth/services/tokenRefresh';
+import {
+  clearSession,
+  getAccessToken,
+  getRefreshToken,
+  ACCESS_TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+} from 'src/auth/services/session';
 
-import { JWT_STORAGE_KEY } from './constant';
+import { isValidToken } from './utils';
 import { AuthContext } from '../auth-context';
-import { setSession, isValidToken } from './utils';
 
 // ----------------------------------------------------------------------
 
 /**
- * NOTE:
- * We only build demo at basic level.
- * Customer will need to do some extra handling yourself if you want to extend the logic and other features...
+ * Back-office session: the user is only "authenticated" while the server confirms the session
+ * (GET /admin/auth/me). An expired access token is refreshed first; if that fails the user is signed out.
  */
-
-const mockResponse = {
-  user: {
-    id: '8864c717-587d-472a-929a-8e5f298024da-0',
-    displayName: 'Jaydon Frankie',
-    photoURL: 'https://api-dev-minimal-v700.pages.dev/assets/images/avatar/avatar-25.webp',
-    phoneNumber: '+1 416-555-0198',
-    country: 'Canada',
-    address: '90210 Broadway Blvd',
-    state: 'California',
-    city: 'San Francisco',
-    zipCode: '94116',
-    about: 'Praesent turpis. Phasellus viverra nulla ut metus varius laoreet. Phasellus tempus.',
-    role: 'admin',
-    isPublic: true,
-    email: 'demo@minimals.cc',
-    password: '@2Minimal',
-  },
-};
 
 export function AuthProvider({ children }) {
   const { state, setState } = useSetState({ user: null, loading: true });
 
   const checkUserSession = useCallback(async () => {
+    const accessToken = getAccessToken();
+
     try {
-      const accessToken = sessionStorage.getItem(JWT_STORAGE_KEY);
+      if (!accessToken || !isValidToken(accessToken)) {
+        if (!getRefreshToken()) {
+          clearSession();
+          setState({ user: null, loading: false });
+          return;
+        }
 
-      if (accessToken && isValidToken(accessToken)) {
-        setSession(accessToken);
-
-        // const res = await axios.get(endpoints.auth.me);
-
-        const { user } = mockResponse;
-
-        setState({ user: { ...user, accessToken }, loading: false });
-      } else {
-        setState({ user: null, loading: false });
+        await refreshSession(accessToken);
       }
+
+      const admin = await fetchCurrentAdmin();
+
+      setState({
+        user: {
+          id: admin.id,
+          email: admin.email,
+          displayName: admin.name || admin.email,
+          photoURL: null,
+          // The template's nav filtering keys off `role`; the backend's own role is kept alongside.
+          role: 'admin',
+          adminRole: admin.role,
+          lastLoginAt: admin.last_login_at,
+          accessToken: getAccessToken(),
+        },
+        loading: false,
+      });
     } catch (error) {
-      console.error(error);
+      // A rejected credential means the session is over. Anything else (server down, network) keeps the
+      // tokens so a reload can retry, but the user is not treated as signed in meanwhile.
+      if (isAuthRejection(error)) {
+        clearSession();
+      } else {
+        console.error('Could not verify admin session', error);
+      }
+
       setState({ user: null, loading: false });
     }
   }, [setState]);
@@ -65,6 +74,18 @@ export function AuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Sign-in / sign-out / token refresh in another tab changes the stored tokens; follow it.
+  useEffect(() => {
+    const onStorage = (event) => {
+      if (event.key === null || event.key === ACCESS_TOKEN_KEY || event.key === REFRESH_TOKEN_KEY) {
+        checkUserSession();
+      }
+    };
+
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [checkUserSession]);
+
   // ----------------------------------------------------------------------
 
   const checkAuthenticated = state.user ? 'authenticated' : 'unauthenticated';
@@ -73,7 +94,7 @@ export function AuthProvider({ children }) {
 
   const memoizedValue = useMemo(
     () => ({
-      user: state.user ? { ...state.user, role: state.user?.role ?? 'admin' } : null,
+      user: state.user,
       checkUserSession,
       loading: status === 'loading',
       authenticated: status === 'authenticated',

@@ -20,7 +20,8 @@ export const paths = {
       resetPassword: `${ROOTS.AUTH}/amplify/reset-password`,
     },
     jwt: {
-      signIn: `${ROOTS.AUTH}/jwt/sign-in`,
+      // The back-office login lives at /sign-in (see src/app/sign-in); /auth/jwt/sign-in is a leftover duplicate.
+      signIn: '/sign-in',
       signUp: `${ROOTS.AUTH}/jwt/sign-up`,
     },
     firebase: {

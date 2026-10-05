@@ -1,13 +1,14 @@
 import { apiClient } from 'src/api/apiClient';
 import { endpoints } from 'src/api/endpoints';
 
-const BASE_URL = 'https://api-dev.hexafoldtech.com';
+import { CONFIG } from 'src/global-config';
+
+const BASE_URL = CONFIG.apiUrl;
 
 /**
- * Get authentication headers with token
+ * Request headers. The admin Bearer token is attached by the axios interceptor (src/api/axiosInstance.js).
  */
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
   return {
     'Content-Type': 'application/json',
     'x-api-key': process.env.NEXT_PUBLIC_API_KEY,

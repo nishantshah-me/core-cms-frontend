@@ -8,55 +8,58 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
-import Link from '@mui/material/Link';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 
-import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
-import { RouterLink } from 'src/routes/components';
+import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { Iconify } from 'src/components/iconify';
-import { Form, Field, schemaUtils } from 'src/components/hook-form';
+import { Form, Field } from 'src/components/hook-form';
 import { CONFIG } from 'src/global-config';
 
 import { useAuthContext } from '../../hooks';
 
 import { FormHead } from '../../components/form-head';
+import { JwtMfaForm } from './jwt-mfa-form';
 
-import { signInWithPassword } from 'src/auth/services/authService';
+import { loginWithPassword, startMfaSetup } from 'src/auth/services/authService';
+import { getApiErrorMessage, getSafeReturnTo } from 'src/auth/utils';
 
 // ----------------------------------------------------------------------
 
 export const SignInSchema = z.object({
-  username: z.string().min(1, { message: 'Username is required' }),
-  password: z
+  email: z
     .string()
-    .min(1, { message: 'Password is required!' })
-    .min(6, { message: 'Password must be at least 6 characters!' }),
+    .min(1, { message: 'Email is required' })
+    .email({ message: 'Enter a valid email address' }),
+  password: z.string().min(1, { message: 'Password is required' }),
 });
 
 // ----------------------------------------------------------------------
 
+/**
+ * Back-office sign-in: password, then an authenticator code (first login enrols the authenticator).
+ * The short-lived mfa_token between the two steps is held in component state only, never in storage.
+ */
 export function JwtSignInView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { checkUserSession } = useAuthContext();
 
+  // null while entering credentials; { mode: 'setup' | 'verify', mfaToken, setup? } for the second step.
+  const [mfa, setMfa] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-  // const defaultValues = {
-  //   username: 'shubhammulay@gmail.com',
-  //   password: 'Recruiter@123',
-  // };
 
   const methods = useForm({
     resolver: zodResolver(SignInSchema),
-    // defaultValues,
+    defaultValues: { email: '', password: '' },
   });
 
   const {
+    setValue,
     handleSubmit,
     formState: { isSubmitting },
   } = methods;
@@ -64,55 +67,77 @@ export function JwtSignInView() {
   const onSubmit = handleSubmit(async (data) => {
     setErrorMessage(null);
     try {
-      // call backend login
-      await signInWithPassword({ username: data.username, password: data.password });
+      const login = await loginWithPassword({ email: data.email.trim(), password: data.password });
 
-      // optional: tell your auth context to re-check session (if implemented)
-      await checkUserSession?.();
+      if (login.mfa_setup_required) {
+        // Requested here, once, rather than in an effect: every call issues a new secret.
+        const setup = await startMfaSetup(login.mfa_token);
+        setMfa({ mode: 'setup', mfaToken: login.mfa_token, setup });
+      } else {
+        setMfa({ mode: 'verify', mfaToken: login.mfa_token });
+      }
 
-      // redirect after successful login
-      router.push(CONFIG.auth.redirectPath);
+      setValue('password', '');
     } catch (error) {
       console.error('Login error', error);
-      const msg = error?.message || error?.detail || JSON.stringify(error);
-      setErrorMessage(msg || 'Login failed');
+      setErrorMessage(getApiErrorMessage(error, 'Login failed. Please try again.'));
     }
   });
 
+  const handleMfaSuccess = async () => {
+    // Re-verifies the new session against /admin/auth/me and flips the auth context to authenticated.
+    await checkUserSession();
+
+    router.replace(getSafeReturnTo(searchParams.get('returnTo'), CONFIG.auth.redirectPath));
+  };
+
+  const handleRestart = (message) => {
+    setMfa(null);
+    setErrorMessage(message ?? null);
+  };
+
+  if (mfa) {
+    return (
+      <JwtMfaForm
+        mode={mfa.mode}
+        mfaToken={mfa.mfaToken}
+        setup={mfa.setup}
+        onSuccess={handleMfaSuccess}
+        onRestart={handleRestart}
+      />
+    );
+  }
+
   const renderForm = () => (
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
-      <Field.Text name="username" label="Username" slotProps={{ inputLabel: { shrink: true } }} />
+      <Field.Text
+        name="email"
+        label="Email address"
+        slotProps={{ inputLabel: { shrink: true }, htmlInput: { autoComplete: 'username' } }}
+      />
 
-      <Box sx={{ gap: 1.5, display: 'flex', flexDirection: 'column' }}>
-        <Link
-          component={RouterLink}
-          href="#"
-          variant="body2"
-          color="inherit"
-          sx={{ alignSelf: 'flex-end' }}
-        >
-          Forgot password?
-        </Link>
-
-        <Field.Text
-          name="password"
-          label="Password"
-          type={showPassword ? 'text' : 'password'} // toggle input type
-          slotProps={{
-            inputLabel: { shrink: true },
-            input: {
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton onClick={() => setShowPassword((prev) => !prev)} edge="end">
-                    <Iconify icon={showPassword ? 'solar:eye-bold' : 'solar:eye-closed-bold'} />
-                    {/* toggle between eye open / closed */}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-      </Box>
+      <Field.Text
+        name="password"
+        label="Password"
+        type={showPassword ? 'text' : 'password'}
+        slotProps={{
+          inputLabel: { shrink: true },
+          htmlInput: { autoComplete: 'current-password' },
+          input: {
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  edge="end"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <Iconify icon={showPassword ? 'solar:eye-bold' : 'solar:eye-closed-bold'} />
+                </IconButton>
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
 
       <Button
         fullWidth
@@ -122,7 +147,7 @@ export function JwtSignInView() {
         variant="contained"
         disabled={isSubmitting}
       >
-        {isSubmitting ? 'Signing in...' : 'Sign in'}
+        {isSubmitting ? 'Signing in...' : 'Continue'}
       </Button>
     </Box>
   );
@@ -130,22 +155,10 @@ export function JwtSignInView() {
   return (
     <>
       <FormHead
-        title="Sign in to your account"
-        description={
-          <>
-            {`Don’t have an account? `}
-            <Link component={RouterLink} href={'/sign-up'} variant="subtitle2">
-              Get started
-            </Link>
-          </>
-        }
+        title="Back office sign in"
+        description="Access is limited to platform administrators."
         sx={{ textAlign: { xs: 'center', md: 'left' } }}
       />
-
-      {/* <Alert severity="info" sx={{ mb: 3 }}>
-        Use <strong>{defaultValues.username}</strong> with password{' '}
-        <strong>{defaultValues.password}</strong>
-      </Alert> */}
 
       {!!errorMessage && (
         <Alert severity="error" sx={{ mb: 3 }}>

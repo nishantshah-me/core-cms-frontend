@@ -51,6 +51,7 @@
     "minimal-shared": "^1.0.15",
     "next": "^15.4.6",
     "nprogress": "^0.2.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.62.0",

@@ -1,96 +1,89 @@
-import { apiClient } from 'src/api/apiClient';
+import axiosInstance from 'src/api/axiosInstance';
 import { endpoints } from 'src/api/endpoints';
 
-const ACCESS_TOKEN_KEY = 'access_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
-const USER_PROFILE_KEY = 'user_profile';
+import { CONFIG } from 'src/global-config';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+import { isValidToken } from 'src/auth/context/jwt/utils';
 
-// ----------------- LOGIN -----------------
-export async function signInWithPassword({ username, password }) {
-  const url = `${SUPABASE_URL}/auth/v1${endpoints.auth.signIn}`;
+import { exchangeRefreshToken } from './tokenRefresh';
+import { setTokens, clearSession, getAccessToken, getRefreshToken } from './session';
 
-  const payload = await apiClient({
-    method: 'POST',
-    url,
-    data: { email: username, password },
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      'Content-Type': 'application/json',
-    },
-  });
+const url = (path) => `${CONFIG.apiUrl}${path}`;
 
-  if (!payload?.access_token) throw new Error('Login failed: no access token returned');
-
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(ACCESS_TOKEN_KEY, payload.access_token);
-    localStorage.setItem(REFRESH_TOKEN_KEY, payload.refresh_token);
-    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(payload.user));
+function storeSession(data) {
+  if (!data?.access_token || !data?.refresh_token) {
+    throw new Error('Login failed: no tokens returned');
   }
-
-  return payload;
+  setTokens(data);
+  return data;
 }
 
-// ----------------- REFRESH TOKEN -----------------
-export async function refreshAccessToken() {
-  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!refreshToken) throw new Error('No refresh token found');
+// ----------------- LOGIN (2 steps) -----------------
 
-  const url = `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`;
+/**
+ * Step 1. A correct password only yields a short-lived `mfa_token` (valid ~5 minutes) plus which MFA
+ * step comes next: `mfa_setup_required` (first login: enrol an authenticator) or `mfa_required`.
+ */
+export async function loginWithPassword({ email, password }) {
+  const { data } = await axiosInstance.post(url(endpoints.auth.signIn), { email, password });
+  return data;
+}
 
-  const response = await apiClient({
-    method: 'POST',
-    url,
-    data: { refresh_token: refreshToken },
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      'Content-Type': 'application/json',
-    },
+/** First login only: returns `otpauth_uri` (render as a QR code) and `secret` (manual entry). Each call issues a new secret. */
+export async function startMfaSetup(mfaToken) {
+  const { data } = await axiosInstance.post(url(endpoints.auth.mfaSetup), { mfa_token: mfaToken });
+  return data;
+}
+
+/** Step 2 for a first login: confirms the authenticator and signs in (tokens are stored). */
+export async function confirmMfaSetup({ mfaToken, code }) {
+  const { data } = await axiosInstance.post(url(endpoints.auth.mfaConfirm), {
+    mfa_token: mfaToken,
+    code,
   });
+  return storeSession(data);
+}
 
-  if (response?.access_token) {
-    localStorage.setItem(ACCESS_TOKEN_KEY, response.access_token);
-    localStorage.setItem(REFRESH_TOKEN_KEY, response.refresh_token);
-    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(response.user));
-    return response.access_token;
-  }
+/** Step 2 for every later login: checks the authenticator code and signs in (tokens are stored). */
+export async function verifyMfa({ mfaToken, code }) {
+  const { data } = await axiosInstance.post(url(endpoints.auth.mfaVerify), {
+    mfa_token: mfaToken,
+    code,
+  });
+  return storeSession(data);
+}
 
-  throw new Error('Failed to refresh token');
+// ----------------- CURRENT ADMIN -----------------
+// Resolves only while the session is live on the server (401 otherwise, after one refresh attempt).
+export async function fetchCurrentAdmin() {
+  const { data } = await axiosInstance.get(url(endpoints.auth.me));
+  return data;
 }
 
 // ----------------- SIGN OUT -----------------
-export function signOut() {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_PROFILE_KEY);
+export async function signOut() {
+  const accessToken = getAccessToken();
+  const refreshToken = getRefreshToken();
+
+  // Local sign-out is immediate and never waits on the network.
+  clearSession();
+
+  if (!accessToken && !refreshToken) return;
+
+  try {
+    let bearer = accessToken;
+
+    if (!bearer || !isValidToken(bearer)) {
+      // An expired access token can't authenticate the logout call, and the refresh token is about to be
+      // discarded for good: trade it in for a fresh access token so the server-side session really ends.
+      if (!refreshToken) return;
+      bearer = (await exchangeRefreshToken(refreshToken)).access_token;
+    }
+
+    await axiosInstance.post(url(endpoints.auth.logout), null, {
+      headers: { Authorization: `Bearer ${bearer}` },
+    });
+  } catch {
+    // Best effort: the local tokens are already gone, and the server session lapses on its own.
   }
 }
-
-// export async function signOut() {
-//   try {
-//     const url = `${SUPABASE_URL}/auth/v1/logout`;
-//     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-
-//     await fetch(url, {
-//       method: 'POST',
-//       headers: {
-//         apikey: SUPABASE_ANON_KEY,
-//         Authorization: `Bearer ${refreshToken}`, // Supabase requires refresh token here
-//         'Content-Type': 'application/json',
-//       },
-//       body: JSON.stringify({ refresh_token: refreshToken }),
-//     });
-//   } catch (error) {
-//     console.error('Error logging out from Supabase:', error);
-//   } finally {
-//     // Always clear local storage (client-side logout)
-//     if (typeof window !== 'undefined') {
-//       localStorage.removeItem(ACCESS_TOKEN_KEY);
-//       localStorage.removeItem(REFRESH_TOKEN_KEY);
-//       localStorage.removeItem(USER_PROFILE_KEY);
-//     }
-//   }
-// }

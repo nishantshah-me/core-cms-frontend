@@ -39,12 +39,13 @@ export function RHFTextField({ name, helperText, slotProps, type = 'text', ...ot
           slotProps={{
             ...slotProps,
             htmlInput: {
+              // Disable autocomplete and autofill by default; sign-in fields opt back in via slotProps.
+              autoComplete: 'new-password',
               ...slotProps?.htmlInput,
               ...(isNumberType && {
                 inputMode: 'decimal',
                 pattern: '[0-9]*\\.?[0-9]*',
               }),
-              autoComplete: 'new-password', // Disable autocomplete and autofill
             },
           }}
           {...other}

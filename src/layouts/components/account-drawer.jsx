@@ -24,7 +24,7 @@ import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { AnimateBorder } from 'src/components/animate';
 
-import { useMockedUser } from 'src/auth/hooks';
+import { useAuthContext } from 'src/auth/hooks';
 
 import { UpgradeBlock } from './nav-upgrade';
 import { AccountButton } from './account-button';
@@ -35,7 +35,7 @@ import { SignOutButton } from './sign-out-button';
 export function AccountDrawer({ data = [], sx, ...other }) {
   const pathname = usePathname();
 
-  const { user } = useMockedUser();
+  const { user } = useAuthContext();
 
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
