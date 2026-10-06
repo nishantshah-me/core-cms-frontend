@@ -1,968 +1,296 @@
-/* eslint-disable perfectionist/sort-imports */
-
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  Box,
-  Card,
-  Button,
-  Typography,
-  Container,
-  Breadcrumbs,
-  Link,
-  Stepper,
-  Step,
-  StepLabel,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  FormHelperText,
-  Chip,
-  Paper,
-  MenuItem,
-  Alert,
-  CircularProgress,
-  Grid,
-} from '@mui/material';
-import { ArrowBack as ArrowBackIcon, Check as CheckIcon } from '@mui/icons-material';
-import { sendOwnerOTP, verifyOwnerOTP, createCompany } from 'src/auth/services/ownerCompanyService';
+import * as z from 'zod';
 import toast from 'react-hot-toast';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState, useEffect } from 'react';
 
-// Industry and employee count options
-const industryOptions = [
-  'IT Services',
-  'Healthcare',
-  'Finance',
-  'Education',
-  'Manufacturing',
-  'Others',
-];
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import Link from '@mui/material/Link';
+import Stack from '@mui/material/Stack';
+import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import Container from '@mui/material/Container';
+import Typography from '@mui/material/Typography';
+import DialogTitle from '@mui/material/DialogTitle';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import CardContent from '@mui/material/CardContent';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
 
-const employeeCountOptions = ['1-50', '51-100', '101-500', '501-1000', '1000+'];
+import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
 
-const steps = ['Owner Onboarding', 'Company Onboarding'];
+import { Form, Field } from 'src/components/hook-form';
+import { LogoLoader } from 'src/components/loading-screen/LogoLoader';
 
-const Page = () => {
+import {
+  getOwner,
+  createOwner,
+  updateOwner,
+  getErrorMessage,
+} from 'src/auth/services/adminOwnerService';
+
+// ----------------------------------------------------------------------
+
+// The name and email limits mirror the database columns (Employee.first_name / last_name / email).
+const OwnerSchema = z.object({
+  first_name: z.string().trim().min(1, 'First name is required').max(15, 'At most 15 characters'),
+  last_name: z.string().trim().max(15, 'At most 15 characters'),
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Email is required')
+    .max(50, 'At most 50 characters')
+    .refine((value) => z.email().safeParse(value).success, 'Enter a valid email address'),
+  phone: z
+    .string()
+    .trim()
+    .refine(
+      (value) => !value || /^\+?\d{7,15}$/.test(value.replace(/[\s\-()]/g, '')),
+      'Enter a valid phone number (7-15 digits)'
+    ),
+});
+
+const EMPTY_VALUES = { first_name: '', last_name: '', email: '', phone: '' };
+
+// ----------------------------------------------------------------------
+
+export default function OwnerFormPage() {
+  return (
+    <Suspense fallback={<LogoLoader sx={{ height: '80vh' }} />}>
+      <OwnerFormView />
+    </Suspense>
+  );
+}
+
+function OwnerFormView() {
   const router = useRouter();
+  const ownerId = useSearchParams().get('owner_id');
+  const isEdit = Boolean(ownerId);
 
-  // Safe initialization to avoid hydration errors
-  const [activeStep, setActiveStep] = useState(0);
-  const [createdOwnerId, setCreatedOwnerId] = useState(null);
-  const [error, setError] = useState('');
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [loading, setLoading] = useState(isEdit);
+  const [loadError, setLoadError] = useState('');
+  const [created, setCreated] = useState(null); // { owner, temporary_password }
 
-  // Owner state
-  const [ownerFormData, setOwnerFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-  });
-  const [ownerErrors, setOwnerErrors] = useState({});
-
-  // Enhanced OTP states
-  const [otpState, setOtpState] = useState({
-    isEmailVerified: false,
-    isPhoneVerified: false,
-    otpSent: false,
-    emailOtp: ['', '', '', '', '', ''],
-    phoneOtp: ['', '', '', '', '', ''],
-    isVerifying: false,
-    isSending: false,
-    resendTimer: 0,
-    otpError: '',
-    needsEmailVerification: false,
-    needsPhoneVerification: false,
+  const methods = useForm({
+    resolver: zodResolver(OwnerSchema),
+    defaultValues: EMPTY_VALUES,
   });
 
-  // Company state
-  const [companyFormData, setCompanyFormData] = useState({
-    companyName: '',
-    industryType: '',
-    companyEmail: '',
-    companyAddress: '',
-    employeeCount: '',
-    companyURL: '',
-    companyPhone: '',
-  });
-  const [companyErrors, setCompanyErrors] = useState({});
+  const {
+    reset,
+    setError,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = methods;
 
-  // Submission state
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Initialize data from localStorage after component mounts to avoid hydration issues
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Get active step from localStorage
-      const savedActiveStep = localStorage.getItem('active_step');
-      if (savedActiveStep) {
-        setActiveStep(Number(savedActiveStep));
-      }
+    if (!ownerId) return undefined;
 
-      // Get created owner ID from localStorage
-      const savedOwnerId = localStorage.getItem('created_owner_id');
-      if (savedOwnerId) {
-        setCreatedOwnerId(savedOwnerId);
-      }
+    let cancelled = false;
 
-      setIsInitialized(true);
-    }
-  }, []);
-
-  // Save active step to localStorage whenever it changes
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem('active_step', activeStep.toString());
-    }
-  }, [activeStep, isInitialized]);
-
-  // Save created owner ID to localStorage
-  useEffect(() => {
-    if (createdOwnerId && isInitialized) {
-      localStorage.setItem('created_owner_id', createdOwnerId);
-    }
-  }, [createdOwnerId, isInitialized]);
-
-  // OTP timer effect
-  useEffect(() => {
-    let interval;
-    if (otpState.resendTimer > 0) {
-      interval = setInterval(() => {
-        setOtpState((prev) => ({
-          ...prev,
-          resendTimer: prev.resendTimer - 1,
-        }));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [otpState.resendTimer]);
-
-  const handleOwnerInputChange = (field) => (event) => {
-    const value = event.target.value;
-    setOwnerFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-
-    // For new creation, reset verification if email or phone changes
-    if (field === 'email' || field === 'phone') {
-      setOtpState((prev) => ({
-        ...prev,
-        isEmailVerified: false,
-        isPhoneVerified: false,
-        otpSent: false,
-        emailOtp: ['', '', '', '', '', ''],
-        phoneOtp: ['', '', '', '', '', ''],
-        otpError: '',
-      }));
-    }
-
-    if (ownerErrors[field]) {
-      setOwnerErrors((prev) => ({
-        ...prev,
-        [field]: '',
-      }));
-    }
-
-    // Clear general error
-    if (error) {
-      setError('');
-    }
-  };
-
-  const handleSendOTP = async () => {
-    // Validation
-    if (!ownerFormData.email || !/\S+@\S+\.\S+/.test(ownerFormData.email)) {
-      setOwnerErrors((prev) => ({ ...prev, email: 'Please enter a valid email address' }));
-      return;
-    }
-
-    if (!ownerFormData.fullName.trim()) {
-      setOwnerErrors((prev) => ({ ...prev, fullName: 'Please enter your full name' }));
-      return;
-    }
-
-    if (!ownerFormData.phone.trim()) {
-      setOwnerErrors((prev) => ({ ...prev, phone: 'Please enter your phone number' }));
-      return;
-    }
-
-    setOtpState((prev) => ({ ...prev, isSending: true, otpError: '' }));
-    setError('');
-
-    try {
-      const otpData = {
-        email: ownerFormData.email.trim(),
-        phone: ownerFormData.phone.trim(),
-        username: ownerFormData.fullName.trim(),
-      };
-
-      await sendOwnerOTP(otpData);
-
-      toast.success('OTP sent to both email and phone successfully');
-
-      setOtpState((prev) => ({
-        ...prev,
-        otpSent: true,
-        isSending: false,
-        resendTimer: 60,
-        emailOtp: ['', '', '', '', '', ''],
-        phoneOtp: ['', '', '', '', '', ''],
-        needsEmailVerification: true,
-        needsPhoneVerification: true,
-      }));
-    } catch (err) {
-      console.error('OTP send error:', err);
-      toast.error(`OTP send error: ${err.message}`);
-      setError(err.message || 'Failed to send OTP. Please try again.');
-      setOtpState((prev) => ({
-        ...prev,
-        isSending: false,
-      }));
-    }
-  };
-
-  const handleOtpChange = (type, index, value) => {
-    if (value.length > 1) return;
-
-    const otpKey = type === 'email' ? 'emailOtp' : 'phoneOtp';
-    const newOtp = [...otpState[otpKey]];
-    newOtp[index] = value;
-
-    setOtpState((prev) => ({
-      ...prev,
-      [otpKey]: newOtp,
-      otpError: '',
-    }));
-
-    if (value && index < 5) {
-      const nextInput = document.getElementById(`${type}-otp-${index + 1}`);
-      if (nextInput) nextInput.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (type, index, event) => {
-    const otpKey = type === 'email' ? 'emailOtp' : 'phoneOtp';
-    if (event.key === 'Backspace' && !otpState[otpKey][index] && index > 0) {
-      const prevInput = document.getElementById(`${type}-otp-${index - 1}`);
-      if (prevInput) prevInput.focus();
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    const emailOtpValue = otpState.emailOtp.join('');
-    const phoneOtpValue = otpState.phoneOtp.join('');
-
-    if (emailOtpValue.length !== 6) {
-      setOtpState((prev) => ({
-        ...prev,
-        otpError: 'Please enter complete 6-digit email OTP',
-      }));
-      return;
-    }
-
-    if (phoneOtpValue.length !== 6) {
-      setOtpState((prev) => ({
-        ...prev,
-        otpError: 'Please enter complete 6-digit phone OTP',
-      }));
-      return;
-    }
-
-    setOtpState((prev) => ({ ...prev, isVerifying: true, otpError: '' }));
-    setError('');
-
-    try {
-      const verifyData = {
-        email: ownerFormData.email.trim(),
-        phone: ownerFormData.phone.trim(),
-        username: ownerFormData.fullName.trim(),
-        email_otp: emailOtpValue,
-        phone_otp: phoneOtpValue,
-      };
-
-      const response = await verifyOwnerOTP(verifyData);
-
-      if (response.owner_id) {
-        setCreatedOwnerId(response.owner_id);
-      }
-
-      toast.success('Email and phone verified successfully');
-
-      setOtpState((prev) => ({
-        ...prev,
-        isEmailVerified: true,
-        isPhoneVerified: true,
-        isVerifying: false,
-      }));
-    } catch (err) {
-      console.error('OTP verification error:', err);
-      toast.error(`OTP verification error: ${err.message}`);
-      setOtpState((prev) => ({
-        ...prev,
-        isVerifying: false,
-        otpError: err.message || 'Invalid OTP. Please try again.',
-      }));
-    }
-  };
-
-  const handleResendOTP = () => {
-    if (otpState.resendTimer === 0) {
-      handleSendOTP();
-    }
-  };
-
-  const validateOwnerForm = () => {
-    const newErrors = {};
-
-    if (!ownerFormData.fullName.trim()) {
-      newErrors.fullName = 'Full name is required';
-    }
-
-    if (!ownerFormData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(ownerFormData.email)) {
-      newErrors.email = 'Email is invalid';
-    }
-
-    if (!ownerFormData.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
-    }
-
-    if (!otpState.isEmailVerified || !otpState.isPhoneVerified) {
-      if (!otpState.isEmailVerified) {
-        newErrors.email = 'Please verify your email address';
-      }
-      if (!otpState.isPhoneVerified) {
-        newErrors.phone = 'Please verify your phone number';
-      }
-    }
-
-    setOwnerErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const validateCompanyForm = () => {
-    const newErrors = {};
-
-    if (!companyFormData.companyName.trim()) {
-      newErrors.companyName = 'Company name is required';
-    }
-
-    if (!companyFormData.industryType) {
-      newErrors.industryType = 'Industry type is required';
-    }
-
-    if (!companyFormData.companyPhone.trim()) {
-      newErrors.companyPhone = 'Company phone number is required';
-    } else if (!/^\d{7,15}$/.test(companyFormData.companyPhone)) {
-      newErrors.companyPhone = 'Please enter a valid phone number';
-    }
-
-    if (!companyFormData.companyEmail.trim()) {
-      newErrors.companyEmail = 'Company email is required';
-    } else if (!/\S+@\S+\.\S+/.test(companyFormData.companyEmail)) {
-      newErrors.companyEmail = 'Email is invalid';
-    }
-
-    if (!companyFormData.companyAddress.trim()) {
-      newErrors.companyAddress = 'Company address is required';
-    }
-
-    if (!companyFormData.employeeCount) {
-      newErrors.employeeCount = 'Employee count is required';
-    }
-
-    if (!companyFormData.companyURL.trim()) {
-      newErrors.companyURL = 'Company URL is required';
-    } else {
+    (async () => {
       try {
-        new URL(companyFormData.companyURL);
-      } catch {
-        newErrors.companyURL = 'Please enter a valid URL (e.g., https://example.com)';
+        const owner = await getOwner(ownerId);
+        if (cancelled) return;
+
+        reset({
+          first_name: owner.first_name ?? '',
+          last_name: owner.last_name ?? '',
+          email: owner.email ?? '',
+          phone: owner.phone ?? '',
+        });
+      } catch (err) {
+        if (!cancelled) setLoadError(getErrorMessage(err, 'Failed to load this owner.'));
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    }
+    })();
 
-    setCompanyErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerId, reset]);
 
-  const handleNext = async () => {
-    if (activeStep === 0) {
-      if (!validateOwnerForm()) {
-        return;
-      }
-    }
-
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
-  };
-
-  const handleBack = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep - 1);
-  };
-
-  const handleFinalSubmit = async () => {
-    if (!validateCompanyForm()) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError('');
+  const onSubmit = handleSubmit(async (values) => {
+    const payload = {
+      first_name: values.first_name,
+      last_name: values.last_name,
+      email: values.email,
+      phone: values.phone,
+    };
 
     try {
-      const ownerId = createdOwnerId;
-      if (!ownerId) {
-        throw new Error('Owner ID not found. Please try the process again.');
+      if (isEdit) {
+        await updateOwner(ownerId, payload);
+        toast.success('Owner updated');
+        router.push(paths.dashboard.ownerDetails(ownerId));
+      } else {
+        setCreated(await createOwner(payload));
       }
-
-      const companyData = {
-        owner_id: ownerId,
-        name: companyFormData.companyName,
-        website: companyFormData.companyURL,
-        phone: ownerFormData.phone,
-        email: companyFormData.companyEmail,
-        office_address: companyFormData.companyAddress,
-        employee_count: companyFormData.employeeCount,
-        industry_type: companyFormData.industryType,
-        phone: companyFormData.companyPhone,
-      };
-
-      await createCompany(companyData);
-      toast.success('Owner and company created successfully');
-
-      localStorage.removeItem('active_step');
-      localStorage.removeItem('created_owner_id');
-
-      router.push('/dashboard/owners');
     } catch (err) {
-      console.error('Error saving data:', err);
-      toast.error(`Error saving data: ${err.message || err}`);
-      setError(err.message || 'Failed to save data. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+      const message = getErrorMessage(err, `Could not ${isEdit ? 'update' : 'add'} this owner.`);
 
-  const handleCompanyInputChange = (field) => (event) => {
-    const value = event.target.value;
-    setCompanyFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-
-    if (companyErrors[field]) {
-      setCompanyErrors((prev) => ({
-        ...prev,
-        [field]: '',
-      }));
-    }
-
-    if (error) {
-      setError('');
-    }
-  };
-
-  const isContinueDisabled = () => {
-    if (activeStep === 0) {
-      if (
-        !ownerFormData.fullName.trim() ||
-        !ownerFormData.email.trim() ||
-        !ownerFormData.phone.trim()
-      ) {
-        return true;
+      // The only conflict the API reports is an email already in use; show it on the field.
+      if (/email/i.test(message)) {
+        setError('email', { type: 'server', message });
+      } else {
+        toast.error(message);
       }
-      return !otpState.isEmailVerified || !otpState.isPhoneVerified;
     }
-    return false;
-  };
+  });
 
-  const shouldShowSendOTPButton = () => {
-    return !otpState.otpSent;
-  };
+  const backHref = isEdit ? paths.dashboard.ownerDetails(ownerId) : paths.dashboard.owners;
 
-  const renderOTPSection = () => {
-    if (!otpState.otpSent) return null;
-
-    const needsEmailOTP = !otpState.isEmailVerified;
-    const needsPhoneOTP = !otpState.isPhoneVerified;
-
-    if (!needsEmailOTP && !needsPhoneOTP) return null;
-
-    return (
-      <Box sx={{ gridColumn: { xs: 'span 1', md: 'span 2' } }}>
-        <Paper
-          sx={{
-            p: 4,
-            mt: 2,
-            backgroundColor: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '12px',
-          }}
-        >
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography variant="h6" sx={{ mb: 1, fontWeight: 'medium' }}>
-              Enter Verification Code{needsEmailOTP && needsPhoneOTP ? 's' : ''}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {needsEmailOTP && needsPhoneOTP
-                ? 'Please enter the 6-digit codes sent to your email and phone'
-                : needsEmailOTP
-                  ? 'Please enter the 6-digit code sent to your email'
-                  : 'Please enter the 6-digit code sent to your phone'}
-            </Typography>
-          </Box>
-
-          <Grid container spacing={4} justifyContent="center">
-            {needsEmailOTP && (
-              <Grid item xs={12} md={needsPhoneOTP ? 6 : 8}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'medium' }}>
-                    Email OTP
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Sent to: {ownerFormData.email}
-                  </Typography>
-                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mb: 2 }}>
-                    {otpState.emailOtp.map((digit, index) => (
-                      <TextField
-                        key={index}
-                        id={`email-otp-${index}`}
-                        value={digit}
-                        onChange={(e) => handleOtpChange('email', index, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown('email', index, e)}
-                        inputProps={{
-                          maxLength: 1,
-                          style: { textAlign: 'center', fontSize: '1.1rem', fontWeight: 'bold' },
-                        }}
-                        sx={{
-                          width: 40,
-                          '& .MuiOutlinedInput-root': { height: 40, borderRadius: '6px' },
-                        }}
-                        error={Boolean(otpState.otpError)}
-                      />
-                    ))}
-                  </Box>
-                </Box>
-              </Grid>
-            )}
-
-            {needsPhoneOTP && (
-              <Grid item xs={12} md={needsEmailOTP ? 6 : 8}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'medium' }}>
-                    Phone OTP
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Sent to: {ownerFormData.phone}
-                  </Typography>
-                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mb: 2 }}>
-                    {otpState.phoneOtp.map((digit, index) => (
-                      <TextField
-                        key={index}
-                        id={`phone-otp-${index}`}
-                        value={digit}
-                        onChange={(e) => handleOtpChange('phone', index, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown('phone', index, e)}
-                        inputProps={{
-                          maxLength: 1,
-                          style: { textAlign: 'center', fontSize: '1.1rem', fontWeight: 'bold' },
-                        }}
-                        sx={{
-                          width: 40,
-                          '& .MuiOutlinedInput-root': { height: 40, borderRadius: '6px' },
-                        }}
-                        error={Boolean(otpState.otpError)}
-                      />
-                    ))}
-                  </Box>
-                </Box>
-              </Grid>
-            )}
-          </Grid>
-
-          {otpState.otpError && (
-            <Typography
-              color="error"
-              variant="body2"
-              sx={{ textAlign: 'center', mb: 3, fontWeight: 'medium' }}
-            >
-              {otpState.otpError}
-            </Typography>
-          )}
-
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <Button
-              variant="contained"
-              onClick={handleVerifyOTP}
-              disabled={
-                otpState.isVerifying ||
-                (needsEmailOTP && otpState.emailOtp.join('').length !== 6) ||
-                (needsPhoneOTP && otpState.phoneOtp.join('').length !== 6)
-              }
-              sx={{
-                px: 4,
-                py: 1.5,
-                fontWeight: 'medium',
-                textTransform: 'none',
-                borderRadius: '8px',
-              }}
-              startIcon={otpState.isVerifying ? <CircularProgress size={16} /> : null}
-            >
-              {otpState.isVerifying
-                ? 'Verifying...'
-                : `Verify ${needsEmailOTP && needsPhoneOTP ? 'Both Codes' : 'Code'}`}
-            </Button>
-
-            <Button
-              variant="text"
-              onClick={handleResendOTP}
-              disabled={otpState.resendTimer > 0}
-              sx={{
-                px: 2,
-                py: 1.5,
-                fontWeight: 'medium',
-                textTransform: 'none',
-                borderRadius: '8px',
-              }}
-            >
-              {otpState.resendTimer > 0 ? `Resend in ${otpState.resendTimer}s` : 'Resend Code'}
-            </Button>
-          </Box>
-        </Paper>
-      </Box>
-    );
-  };
-
-  const renderOwnerStep = () => (
-    <Box>
-      <Card sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 3 }}>
-          Owner Information
-        </Typography>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)' },
-            gap: 2,
-          }}
-        >
-          <TextField
-            fullWidth
-            label="Full Name"
-            value={ownerFormData.fullName}
-            onChange={handleOwnerInputChange('fullName')}
-            error={Boolean(ownerErrors.fullName)}
-            helperText={ownerErrors.fullName}
-            required
-          />
-
-          <Box sx={{ position: 'relative' }}>
-            <TextField
-              fullWidth
-              label="Mobile Number"
-              value={ownerFormData.phone}
-              onChange={handleOwnerInputChange('phone')}
-              error={Boolean(ownerErrors.phone)}
-              helperText={ownerErrors.phone}
-              required
-              disabled={otpState.isPhoneVerified}
-              sx={{
-                '& .MuiInputBase-root': {
-                  paddingRight: otpState.isPhoneVerified ? '120px' : 'inherit',
-                },
-              }}
-            />
-            {otpState.isPhoneVerified && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  right: 8,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  zIndex: 1,
-                }}
-              >
-                <Chip
-                  label="Verified"
-                  color="success"
-                  size="small"
-                  icon={<CheckIcon />}
-                  sx={{ fontWeight: 'medium' }}
-                />
-              </Box>
-            )}
-          </Box>
-
-          <Box sx={{ position: 'relative' }}>
-            <TextField
-              fullWidth
-              label="Working Email"
-              type="email"
-              value={ownerFormData.email}
-              onChange={handleOwnerInputChange('email')}
-              error={Boolean(ownerErrors.email)}
-              helperText={ownerErrors.email}
-              required
-              disabled={otpState.isEmailVerified}
-              sx={{
-                '& .MuiInputBase-root': {
-                  paddingRight: otpState.isEmailVerified ? '120px' : 'inherit',
-                },
-              }}
-            />
-            {otpState.isEmailVerified && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  right: 8,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  zIndex: 1,
-                }}
-              >
-                <Chip
-                  label="Verified"
-                  color="success"
-                  size="small"
-                  icon={<CheckIcon />}
-                  sx={{ fontWeight: 'medium' }}
-                />
-              </Box>
-            )}
-          </Box>
-
-          {shouldShowSendOTPButton() && (
-            <Box
-              sx={{
-                gridColumn: { xs: 'span 1', md: 'span 2' },
-                display: 'flex',
-                justifyContent: 'center',
-              }}
-            >
-              <Button
-                variant="contained"
-                onClick={handleSendOTP}
-                disabled={
-                  otpState.isSending ||
-                  !ownerFormData.email ||
-                  !ownerFormData.phone ||
-                  !ownerFormData.fullName
-                }
-                sx={{
-                  minWidth: '200px',
-                  height: '48px',
-                  fontSize: '1rem',
-                  fontWeight: 'medium',
-                  textTransform: 'none',
-                  borderRadius: '8px',
-                }}
-              >
-                {otpState.isSending ? (
-                  <>
-                    <CircularProgress size={20} sx={{ mr: 1 }} />
-                    Sending OTP...
-                  </>
-                ) : (
-                  'Send Verification Code'
-                )}
-              </Button>
-            </Box>
-          )}
-
-          {renderOTPSection()}
-        </Box>
-      </Card>
-    </Box>
-  );
-
-  const renderCompanyStep = () => (
-    <Box>
-      <Card sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 3 }}>
-          Company Information
-        </Typography>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)' },
-            gap: 2,
-          }}
-        >
-          <TextField
-            fullWidth
-            label="Company Name"
-            value={companyFormData.companyName}
-            onChange={handleCompanyInputChange('companyName')}
-            error={Boolean(companyErrors.companyName)}
-            helperText={companyErrors.companyName}
-            required
-          />
-          <FormControl fullWidth error={Boolean(companyErrors.industryType)} required>
-            <InputLabel>Industry Type</InputLabel>
-            <Select
-              value={companyFormData.industryType}
-              onChange={handleCompanyInputChange('industryType')}
-              label="Industry Type"
-            >
-              {industryOptions.map((industry) => (
-                <MenuItem key={industry} value={industry}>
-                  {industry}
-                </MenuItem>
-              ))}
-            </Select>
-            {companyErrors.industryType && (
-              <FormHelperText>{companyErrors.industryType}</FormHelperText>
-            )}
-          </FormControl>
-          <TextField
-            fullWidth
-            label="Company Email"
-            type="email"
-            value={companyFormData.companyEmail}
-            onChange={handleCompanyInputChange('companyEmail')}
-            error={Boolean(companyErrors.companyEmail)}
-            helperText={companyErrors.companyEmail}
-            required
-          />
-          <TextField
-            fullWidth
-            label="Company Number"
-            value={companyFormData.companyPhone}
-            onChange={handleCompanyInputChange('companyPhone')}
-            error={Boolean(companyErrors.companyPhone)}
-            helperText={companyErrors.companyPhone}
-            required
-          />
-
-          <FormControl fullWidth error={Boolean(companyErrors.employeeCount)} required>
-            <InputLabel>Employee Count</InputLabel>
-            <Select
-              value={companyFormData.employeeCount}
-              onChange={handleCompanyInputChange('employeeCount')}
-              label="Employee Count"
-            >
-              {employeeCountOptions.map((count) => (
-                <MenuItem key={count} value={count}>
-                  {count}
-                </MenuItem>
-              ))}
-            </Select>
-            {companyErrors.employeeCount && (
-              <FormHelperText>{companyErrors.employeeCount}</FormHelperText>
-            )}
-          </FormControl>
-
-          <TextField
-            fullWidth
-            label="Company URL"
-            value={companyFormData.companyURL}
-            onChange={handleCompanyInputChange('companyURL')}
-            error={Boolean(companyErrors.companyURL)}
-            helperText={companyErrors.companyURL}
-            required
-            placeholder="https://example.com"
-          />
-
-          <TextField
-            fullWidth
-            label="Company Address"
-            value={companyFormData.companyAddress}
-            onChange={handleCompanyInputChange('companyAddress')}
-            error={Boolean(companyErrors.companyAddress)}
-            helperText={companyErrors.companyAddress}
-            required
-            multiline
-            rows={2}
-            sx={{ gridColumn: { md: 'span 2' } }}
-          />
-        </Box>
-      </Card>
-    </Box>
-  );
-
-  // Show loading screen while initializing
-  if (!isInitialized) {
-    return (
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '80vh',
-          width: '100%',
-        }}
-      >
-        <CircularProgress size={40} />
-        <Typography variant="body1" sx={{ mt: 2 }}>
-          Initializing...
-        </Typography>
-      </Box>
-    );
+  if (loading) {
+    return <LogoLoader sx={{ height: '80vh' }} />;
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Breadcrumbs>
-          <Link color="inherit" href="/dashboard">
-            Dashboard
-          </Link>
-          <Link color="inherit" href="/dashboard/owners">
-            Owner
-          </Link>
-          <Typography color="text.primary">Create</Typography>
-        </Breadcrumbs>
-      </Box>
+    <Container maxWidth="sm" sx={{ mt: 4, mb: 4 }}>
+      <Breadcrumbs sx={{ mb: 3 }}>
+        <Link component={RouterLink} color="inherit" href={paths.dashboard.root} underline="hover">
+          Dashboard
+        </Link>
+        <Link
+          component={RouterLink}
+          color="inherit"
+          href={paths.dashboard.owners}
+          underline="hover"
+        >
+          Owners
+        </Link>
+        <Typography color="text.primary">{isEdit ? 'Edit owner' : 'Add owner'}</Typography>
+      </Breadcrumbs>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
+      <Typography variant="h4" sx={{ mb: 3 }}>
+        {isEdit ? 'Edit owner' : 'Add owner'}
+      </Typography>
+
+      {loadError ? (
+        <Alert severity="error">{loadError}</Alert>
+      ) : (
+        <Card>
+          <CardContent>
+            {!isEdit && (
+              <Alert severity="info" sx={{ mb: 3 }}>
+                The owner is approved straight away. You will get a temporary password to pass on;
+                they are asked to change it when they first sign in.
+              </Alert>
+            )}
+
+            <Form methods={methods} onSubmit={onSubmit}>
+              <Stack spacing={3}>
+                <Box
+                  sx={{
+                    gap: 3,
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+                  }}
+                >
+                  <Field.Text name="first_name" label="First name" required />
+                  <Field.Text name="last_name" label="Last name" />
+                </Box>
+
+                <Field.Text name="email" label="Email" type="email" required />
+                <Field.Text
+                  name="phone"
+                  label="Phone"
+                  placeholder="+91 98765 43210"
+                  helperText="Optional"
+                />
+
+                <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'flex-end' }}>
+                  <Button
+                    color="inherit"
+                    variant="outlined"
+                    disabled={isSubmitting}
+                    onClick={() => router.push(backHref)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="contained" loading={isSubmitting}>
+                    {isEdit ? 'Save changes' : 'Add owner'}
+                  </Button>
+                </Stack>
+              </Stack>
+            </Form>
+          </CardContent>
+        </Card>
       )}
 
-      <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-        {steps.map((label) => (
-          <Step key={label}>
-            <StepLabel>{label}</StepLabel>
-          </Step>
-        ))}
-      </Stepper>
-
-      <Box sx={{ mb: 4 }}>
-        {activeStep === 0 && renderOwnerStep()}
-        {activeStep === 1 && renderCompanyStep()}
-      </Box>
-
-      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-        <Button
-          disabled={activeStep === 0}
-          onClick={handleBack}
-          startIcon={<ArrowBackIcon />}
-          variant="outlined"
-        >
-          Back
-        </Button>
-
-        {activeStep === steps.length - 1 ? (
-          <Button
-            onClick={handleFinalSubmit}
-            disabled={isSubmitting}
-            endIcon={isSubmitting ? <CircularProgress size={16} /> : <CheckIcon />}
-            variant="contained"
-          >
-            {isSubmitting ? 'Creating Account...' : 'Create Account'}
-          </Button>
-        ) : (
-          <Button onClick={handleNext} variant="contained" disabled={isContinueDisabled()}>
-            Continue
-          </Button>
-        )}
-      </Box>
+      <TemporaryPasswordDialog
+        created={created}
+        onDone={() => router.push(paths.dashboard.ownerDetails(created.owner.id))}
+      />
     </Container>
   );
-};
+}
 
-export default Page;
+// ----------------------------------------------------------------------
+
+/** The API returns the temporary password once, so this can't be dismissed by a stray click. */
+function TemporaryPasswordDialog({ created, onDone }) {
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(created.temporary_password);
+      toast.success('Password copied');
+    } catch {
+      toast.error('Could not copy. Select the password and copy it manually.');
+    }
+  };
+
+  return (
+    <Dialog open={Boolean(created)} maxWidth="xs" fullWidth disableEscapeKeyDown>
+      <DialogTitle>Owner added</DialogTitle>
+
+      {created && (
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+            Share these sign-in details with {created.owner.name || created.owner.email}. The
+            password is shown only once and cannot be retrieved later.
+          </Typography>
+
+          <Stack spacing={0.5} sx={{ mb: 2 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              Email
+            </Typography>
+            <Typography variant="body2">{created.owner.email}</Typography>
+          </Stack>
+
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            Temporary password
+          </Typography>
+          <Box
+            sx={{
+              p: 1.5,
+              mt: 0.5,
+              borderRadius: 1,
+              fontFamily: 'monospace',
+              fontSize: 16,
+              userSelect: 'all',
+              wordBreak: 'break-all',
+              bgcolor: 'background.neutral',
+            }}
+          >
+            {created.temporary_password}
+          </Box>
+        </DialogContent>
+      )}
+
+      <DialogActions>
+        <Button color="inherit" variant="outlined" onClick={handleCopy}>
+          Copy password
+        </Button>
+        <Button variant="contained" onClick={onDone}>
+          Done
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}

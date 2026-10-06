@@ -1,404 +1,359 @@
-/* eslint-disable perfectionist/sort-imports */
-
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Box,
-  Card,
-  Table,
-  Button,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  IconButton,
-  Typography,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Container,
-  Breadcrumbs,
-  Link,
-  TableContainer,
-  MenuList,
-  Alert,
-  CircularProgress,
-  TextField,
-  InputAdornment,
-  FormControl,
-  InputLabel,
-  Select,
-} from '@mui/material';
+import lodash from 'lodash';
+import toast from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
+
+import Box from '@mui/material/Box';
+import Tab from '@mui/material/Tab';
+import Card from '@mui/material/Card';
+import Link from '@mui/material/Link';
+import Tabs from '@mui/material/Tabs';
+import Alert from '@mui/material/Alert';
+import Table from '@mui/material/Table';
+import Select from '@mui/material/Select';
+import Button from '@mui/material/Button';
+import MenuItem from '@mui/material/MenuItem';
+import MenuList from '@mui/material/MenuList';
+import TableRow from '@mui/material/TableRow';
+import TableHead from '@mui/material/TableHead';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import Container from '@mui/material/Container';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import InputLabel from '@mui/material/InputLabel';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import FormControl from '@mui/material/FormControl';
+import TableContainer from '@mui/material/TableContainer';
+import InputAdornment from '@mui/material/InputAdornment';
+import CircularProgress from '@mui/material/CircularProgress';
+import TablePagination from '@mui/material/TablePagination';
 import {
   Add as AddIcon,
   Edit as EditIcon,
+  Clear as ClearIcon,
+  Search as SearchIcon,
   Delete as DeleteIcon,
   MoreVert as MoreVertIcon,
-  NavigateNext as NavigateNextIcon,
-  NavigateBefore as NavigateBeforeIcon,
   Visibility as VisibilityIcon,
-  Search as SearchIcon,
-  Clear as ClearIcon,
+  CheckCircleOutline as ApproveIcon,
+  HighlightOff as RejectIcon,
+  Block as DeactivateIcon,
+  LockOpen as ActivateIcon,
 } from '@mui/icons-material';
-import toast from 'react-hot-toast';
-import { useRouter } from 'next/navigation';
-import { CustomPopover } from 'src/components/custom-popover';
-import {
-  getOwnersWithCompanies,
-  deleteOwner,
-  deleteCompany,
-} from 'src/auth/services/ownerCompanyService';
-import { LogoLoader } from 'src/components/loading-screen/LogoLoader';
-import lodash from 'lodash';
 
-// Generate month options
-const monthOptions = [
-  { value: '', label: 'All Months' },
-  { value: '1', label: 'January' },
-  { value: '2', label: 'February' },
-  { value: '3', label: 'March' },
-  { value: '4', label: 'April' },
-  { value: '5', label: 'May' },
-  { value: '6', label: 'June' },
-  { value: '7', label: 'July' },
-  { value: '8', label: 'August' },
-  { value: '9', label: 'September' },
-  { value: '10', label: 'October' },
-  { value: '11', label: 'November' },
-  { value: '12', label: 'December' },
+import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
+
+import { Label } from 'src/components/label';
+import { CustomPopover } from 'src/components/custom-popover';
+
+import { listOwners, getErrorMessage } from 'src/auth/services/adminOwnerService';
+
+import { fOwnerDate } from 'src/sections/owner/owner-utils';
+import { OwnerStatusLabel } from 'src/sections/owner/owner-status-label';
+import { OwnerActionDialog, useOwnerActions } from 'src/sections/owner/owner-actions';
+
+// ----------------------------------------------------------------------
+
+const MONTH_OPTIONS = [
+  { value: '', label: 'All months' },
+  ...[
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ].map((label, index) => ({ value: String(index + 1), label })),
 ];
 
-// Generate year options (current year ± 5 years)
 const currentYear = new Date().getFullYear();
-const yearOptions = [
-  { value: '', label: 'All Years' },
-  ...Array.from({ length: 11 }, (_, i) => {
-    const year = currentYear - 5 + i;
-    return { value: year.toString(), label: year.toString() };
+const YEAR_OPTIONS = [
+  { value: '', label: 'All years' },
+  ...Array.from({ length: 6 }, (_, index) => {
+    const year = String(currentYear - index);
+    return { value: year, label: year };
   }),
 ];
 
-const Page = () => {
+const ACCOUNT_OPTIONS = [
+  { value: '', label: 'All accounts' },
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+];
+
+const STATUS_TABS = [
+  { value: 'all', label: 'All', color: 'default' },
+  { value: 'pending', label: 'Pending', color: 'warning' },
+  { value: 'approved', label: 'Approved', color: 'success' },
+  { value: 'rejected', label: 'Rejected', color: 'error' },
+];
+
+const EMPTY_COUNTS = { all: 0, pending: 0, approved: 0, rejected: 0 };
+const COLUMN_COUNT = 7;
+
+// ----------------------------------------------------------------------
+
+export default function OwnersPage() {
   const router = useRouter();
+
   const [owners, setOwners] = useState([]);
-  const [selected, setSelected] = useState([]);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedOwner, setSelectedOwner] = useState(null);
-  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState(EMPTY_COUNTS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [totalCount, setTotalCount] = useState(0);
 
-  // Filter states
-  const [inputValue, setInputValue] = useState(''); // what user is typing (immediate)
-  const [searchQuery, setSearchQuery] = useState(''); // debounced value used for API
+  const [status, setStatus] = useState('all');
+  const [searchInput, setSearchInput] = useState(''); // what is typed
+  const [search, setSearch] = useState(''); // debounced; what the API gets
+  const [month, setMonth] = useState('');
+  const [year, setYear] = useState('');
+  const [account, setAccount] = useState('');
 
-  const [selectedMonth, setSelectedMonth] = useState('');
-  const [selectedYear, setSelectedYear] = useState('');
+  const [menu, setMenu] = useState({ anchorEl: null, owner: null });
 
-  // Load owners from API with filters
-  const loadOwnersData = useCallback(async () => {
+  const requestId = useRef(0);
+
+  const load = useCallback(async () => {
+    const id = ++requestId.current;
+
+    setLoading(true);
+    setError('');
     try {
-      setLoading(true);
-      setError('');
-      const skip = page * rowsPerPage;
+      const result = await listOwners({
+        search,
+        signupStatus: status,
+        isActive: account ? account === 'active' : undefined,
+        month,
+        year,
+        skip: page * rowsPerPage,
+        limit: rowsPerPage,
+      });
+      if (id !== requestId.current) return; // a newer request superseded this one
 
-      const filters = { skip, limit: rowsPerPage };
-      if (searchQuery.trim()) filters.search = searchQuery.trim();
-      if (selectedMonth) filters.month = selectedMonth;
-      if (selectedYear) filters.year = selectedYear;
-
-      const ownersData = await getOwnersWithCompanies(filters);
-      if (ownersData?.data) {
-        setOwners(ownersData.data);
-        setTotalCount(ownersData.total || 0);
-      } else {
-        setOwners(ownersData || []);
-        setTotalCount(ownersData?.length || 0);
-      }
+      setOwners(result.data ?? []);
+      setTotal(result.total ?? 0);
+      setCounts(result.counts ?? EMPTY_COUNTS);
     } catch (err) {
-      console.error('Error loading owners:', err);
-      toast.error(`Error loading owners: ${err.message}`);
-      setError(err.message || 'Failed to load owners data');
-      setOwners([]);
-      setTotalCount(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, rowsPerPage, searchQuery, selectedMonth, selectedYear]);
+      if (id !== requestId.current) return;
 
-  // Debounced function: updates the actual searchQuery
-  const debouncedSetSearchQuery = useMemo(
+      const message = getErrorMessage(err, 'Failed to load owners.');
+      setError(message);
+      toast.error(message);
+      setOwners([]);
+      setTotal(0);
+    } finally {
+      if (id === requestId.current) setLoading(false);
+    }
+  }, [search, status, account, month, year, page, rowsPerPage]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const actions = useOwnerActions({ onDone: load });
+
+  const debouncedSearch = useMemo(
     () =>
-      lodash.debounce((val) => {
-        setSearchQuery(val);
-        setPage(0); // reset pagination
-      }, 500), // wait 500ms after user stops typing
+      lodash.debounce((value) => {
+        setSearch(value);
+        setPage(0);
+      }, 500),
     []
   );
 
-  // Initial load and reload when filters change
-  useEffect(() => {
-    loadOwnersData();
-  }, [loadOwnersData]);
-
-  //Cancel debounce on unmount
-  useEffect(() => {
-    return () => {
-      debouncedSetSearchQuery.cancel();
-    };
-  }, [debouncedSetSearchQuery]);
+  useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch]);
 
   const handleSearchChange = (event) => {
-    const val = event.target.value;
-    setInputValue(val); // update immediate input for TextField
-    debouncedSetSearchQuery(val); // update debounced query for API
+    setSearchInput(event.target.value);
+    debouncedSearch(event.target.value);
   };
 
   const handleClearSearch = () => {
-    setInputValue('');
-    setSearchQuery('');
+    debouncedSearch.cancel();
+    setSearchInput('');
+    setSearch('');
     setPage(0);
   };
 
-  const handleMonthChange = (event) => {
-    setSelectedMonth(event.target.value);
+  // Changing any filter returns to the first page.
+  const handleFilter = (setter) => (event) => {
+    setter(event.target.value);
     setPage(0);
   };
 
-  const handleYearChange = (event) => {
-    setSelectedYear(event.target.value);
-    setPage(0);
-  };
+  const hasFilters = Boolean(search || month || year || account);
 
-  const hasActiveFilters = searchQuery || selectedMonth || selectedYear;
-
-  const handleMenuOpen = (event, owner) => {
+  const openMenu = (event, owner) => {
     event.stopPropagation();
-    setAnchorEl(event.currentTarget);
-    setSelectedOwner(owner);
+    setMenu({ anchorEl: event.currentTarget, owner });
   };
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedOwner(null);
+  const closeMenu = () => setMenu((prev) => ({ ...prev, anchorEl: null }));
+
+  const runFromMenu = (callback) => () => {
+    const { owner } = menu;
+    closeMenu();
+    callback(owner);
   };
 
-  const handleRowClick = (owner) => {
-    try {
-      const ownerId = owner.id;
-      const companyId = owner.ownerData?.companies?.[0]?.id || null;
-      router.push(
-        `/dashboard/owners/owner-detail?owner_id=${ownerId}${companyId ? `&company_id=${companyId}` : ''}`
-      );
-    } catch (error_) {
-      console.error('Error navigating to owner details:', error_);
-      toast.error('Failed to load owner details');
-    }
-  };
-
-  const handleDeleteSingle = async () => {
-    if (!selectedOwner) return;
-    try {
-      setIsDeleting(true);
-      setError('');
-      if (selectedOwner.companyId) {
-        try {
-          await deleteCompany(selectedOwner.companyId);
-          toast.success('Company deleted successfully');
-        } catch (companyError) {
-          console.warn('Company deletion failed:', companyError);
-          toast('Company deletion failed, continuing with owner deletion', { icon: '⚠️' });
-        }
-      }
-      await deleteOwner(selectedOwner.id);
-      toast.success('Owner deleted successfully');
-      await loadOwnersData();
-      setDeleteDialog(false);
-      setSelectedOwner(null);
-      setSelected((prev) => prev.filter((id) => id !== selectedOwner.id));
-    } catch (err) {
-      console.error('Error deleting owner:', err);
-      toast.error(`Error deleting owner: ${err.message}`);
-      setError(err.message || 'Failed to delete owner');
-    } finally {
-      setIsDeleting(false);
-    }
-    handleMenuClose();
-  };
-
-  const handleAdd = () => {
-    localStorage.removeItem('edit_owner_data');
-    localStorage.removeItem('active_step');
-    localStorage.removeItem('created_owner_id');
-    router.push('/dashboard/owners/create-owner');
-  };
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-    setSelected([]);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-    setSelected([]);
-  };
-
-  const handleViewDetails = () => {
-    if (selectedOwner) {
-      handleRowClick(selectedOwner);
-    }
-    handleMenuClose();
-  };
-
-  if (loading && page === 0 && !hasActiveFilters) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <LogoLoader />
-      </Box>
-    );
-  }
+  const { owner: menuOwner } = menu;
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* Breadcrumbs */}
-      <Box sx={{ mb: 4 }}>
-        <Breadcrumbs>
-          <Link color="inherit" href="/dashboard">
-            Dashboard
-          </Link>
-          <Link color="inherit" href="/dashboard/owners">
-            Owners
-          </Link>
-        </Breadcrumbs>
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Breadcrumbs sx={{ mb: 3 }}>
+        <Link component={RouterLink} color="inherit" href={paths.dashboard.root} underline="hover">
+          Dashboard
+        </Link>
+        <Typography color="text.primary">Owners</Typography>
+      </Breadcrumbs>
+
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4">Owners</Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => router.push(paths.dashboard.ownerNew)}
+        >
+          Add owner
+        </Button>
       </Box>
 
-      {/* Error Alert */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert
+          severity="error"
+          sx={{ mb: 3 }}
+          action={
+            <Button color="inherit" size="small" onClick={load}>
+              Retry
+            </Button>
+          }
+        >
           {error}
         </Alert>
       )}
 
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Owners List</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd}>
-          Add Owner
-        </Button>
-      </Box>
+      <Card>
+        <Tabs
+          value={status}
+          onChange={(_, value) => {
+            setStatus(value);
+            setPage(0);
+          }}
+          sx={{ px: 2.5, boxShadow: (theme) => `inset 0 -2px 0 0 ${theme.vars.palette.divider}` }}
+        >
+          {STATUS_TABS.map((tab) => (
+            <Tab
+              key={tab.value}
+              value={tab.value}
+              label={tab.label}
+              iconPosition="end"
+              icon={
+                <Label variant={tab.value === status ? 'filled' : 'soft'} color={tab.color}>
+                  {counts[tab.value] ?? 0}
+                </Label>
+              }
+            />
+          ))}
+        </Tabs>
 
-      {/* Search + Filters */}
-      <Card sx={{ p: 2, mb: 3 }}>
         <Box
           sx={{
+            p: 2.5,
+            gap: 2,
             display: 'flex',
             flexDirection: { xs: 'column', md: 'row' },
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 2,
+            alignItems: { md: 'center' },
           }}
         >
           <TextField
             fullWidth
-            placeholder="Search by owner name, email, or phone"
-            value={inputValue}
+            placeholder="Search by name, email or phone"
+            value={searchInput}
             onChange={handleSearchChange}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-              endAdornment: inputValue && (
-                <InputAdornment position="end">
-                  <IconButton onClick={handleClearSearch} size="small">
-                    <ClearIcon />
-                  </IconButton>
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+                endAdornment: searchInput && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={handleClearSearch} aria-label="Clear search">
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
             }}
-            sx={{ maxWidth: { md: 400 } }}
           />
 
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <FormControl sx={{ minWidth: 150 }}>
-              <InputLabel>Month</InputLabel>
-              <Select value={selectedMonth} onChange={handleMonthChange} label="Month">
-                {monthOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl sx={{ minWidth: 150 }}>
-              <InputLabel>Year</InputLabel>
-              <Select value={selectedYear} onChange={handleYearChange} label="Year">
-                {yearOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
+          <FilterSelect
+            label="Signed up (month)"
+            value={month}
+            options={MONTH_OPTIONS}
+            onChange={handleFilter(setMonth)}
+          />
+          <FilterSelect
+            label="Signed up (year)"
+            value={year}
+            options={YEAR_OPTIONS}
+            onChange={handleFilter(setYear)}
+          />
+          <FilterSelect
+            label="Account"
+            value={account}
+            options={ACCOUNT_OPTIONS}
+            onChange={handleFilter(setAccount)}
+          />
         </Box>
-      </Card>
 
-      {/* Table */}
-      <Card sx={{ p: 2 }}>
         <TableContainer>
-          <Table>
+          <Table sx={{ minWidth: 880 }}>
             <TableHead>
               <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Email</TableCell>
+                <TableCell>Owner</TableCell>
                 <TableCell>Phone</TableCell>
-                <TableCell>Companies</TableCell>
-                <TableCell width={88}>Actions</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell align="right">Workspaces</TableCell>
+                <TableCell align="right">Companies</TableCell>
+                <TableCell>Signed up</TableCell>
+                <TableCell width={64} />
               </TableRow>
             </TableHead>
+
             <TableBody>
-              {loading ? (
+              {loading && owners.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} sx={{ textAlign: 'center', py: 3 }}>
-                    <CircularProgress />
+                  <TableCell colSpan={COLUMN_COUNT} align="center" sx={{ py: 6 }}>
+                    <CircularProgress size={28} />
                   </TableCell>
                 </TableRow>
               ) : owners.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5}>
-                    <Card sx={{ textAlign: 'center', py: 7, boxShadow: 'none' }}>
-                      <Typography variant="h6" color="text.secondary" gutterBottom>
-                        {hasActiveFilters ? 'No owners found' : 'No owners added yet'}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                        {hasActiveFilters
-                          ? 'Try adjusting your search criteria or clear filters'
-                          : 'Add your owner information to complete the onboarding process'}
-                      </Typography>
-                      {!hasActiveFilters && (
-                        <Button
-                          variant="contained"
-                          startIcon={<AddIcon />}
-                          onClick={handleAdd}
-                          size="large"
-                        >
-                          Add Owner
-                        </Button>
-                      )}
-                    </Card>
+                  <TableCell colSpan={COLUMN_COUNT} align="center" sx={{ py: 8 }}>
+                    <Typography variant="h6" sx={{ color: 'text.secondary' }} gutterBottom>
+                      {hasFilters || status !== 'all' ? 'No owners match' : 'No owners yet'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                      {hasFilters || status !== 'all'
+                        ? 'Try a different search or clear the filters.'
+                        : 'Owners appear here when they sign up, or when you add one.'}
+                    </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -406,31 +361,31 @@ const Page = () => {
                   <TableRow
                     key={owner.id}
                     hover
-                    selected={selected.includes(owner.id)}
-                    onClick={() => handleRowClick(owner)}
-                    sx={{
-                      cursor: 'pointer',
-                      '&:hover': {
-                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                      },
-                    }}
+                    onClick={() => router.push(paths.dashboard.ownerDetails(owner.id))}
+                    sx={{ cursor: 'pointer', opacity: loading ? 0.6 : 1 }}
                   >
                     <TableCell>
-                      <Typography variant="body2" fontWeight="medium">
-                        {owner.name}
+                      <Typography variant="subtitle2" noWrap>
+                        {owner.name || '—'}
+                      </Typography>
+                      <Typography variant="body2" noWrap sx={{ color: 'text.secondary' }}>
+                        {owner.email}
                       </Typography>
                     </TableCell>
+                    <TableCell>{owner.phone || '—'}</TableCell>
                     <TableCell>
-                      <Typography variant="body2">{owner.email}</Typography>
+                      <OwnerStatusLabel owner={owner} />
                     </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{owner.phone}</Typography>
+                    <TableCell align="right">{owner.workspace_count}</TableCell>
+                    <TableCell align="right">{owner.company_count}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                      {fOwnerDate(owner.created_at)}
                     </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{owner.companyCount}</Typography>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <IconButton onClick={(e) => handleMenuOpen(e, owner)}>
+                    <TableCell align="right" onClick={(event) => event.stopPropagation()}>
+                      <IconButton
+                        onClick={(event) => openMenu(event, owner)}
+                        aria-label={`Actions for ${owner.name || owner.email}`}
+                      >
                         <MoreVertIcon />
                       </IconButton>
                     </TableCell>
@@ -441,95 +396,70 @@ const Page = () => {
           </Table>
         </TableContainer>
 
-        {/* Custom Pagination */}
-        {totalCount > 0 && (
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              py: 2,
-              gap: 2,
-            }}
-          >
-            <IconButton
-              onClick={() => handleChangePage(null, page - 1)}
-              disabled={page === 0}
-              sx={{
-                border: '1px solid',
-                borderColor: page === 0 ? 'grey.300' : 'primary.main',
-                '&:hover': {
-                  backgroundColor: 'primary.light',
-                },
-              }}
-            >
-              <NavigateBeforeIcon />
-            </IconButton>
-
-            <Typography variant="body2" sx={{ mx: 2 }}>
-              Page {page + 1} of {Math.ceil(totalCount / rowsPerPage)}
-            </Typography>
-
-            <IconButton
-              onClick={() => handleChangePage(null, page + 1)}
-              disabled={page >= Math.ceil(totalCount / rowsPerPage) - 1}
-              sx={{
-                border: '1px solid',
-                borderColor:
-                  page >= Math.ceil(totalCount / rowsPerPage) - 1 ? 'grey.300' : 'primary.main',
-                '&:hover': {
-                  backgroundColor: 'primary.light',
-                },
-              }}
-            >
-              <NavigateNextIcon />
-            </IconButton>
-
-            <Box sx={{ ml: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2">Rows:</Typography>
-              <FormControl size="small" sx={{ minWidth: 80 }}>
-                <Select value={rowsPerPage} onChange={(e) => handleChangeRowsPerPage(e)}>
-                  <MenuItem value={5}>5</MenuItem>
-                  <MenuItem value={10}>10</MenuItem>
-                  <MenuItem value={25}>25</MenuItem>
-                  <MenuItem value={50}>50</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-          </Box>
-        )}
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          onPageChange={(_, value) => setPage(value)}
+          onRowsPerPageChange={(event) => {
+            setRowsPerPage(parseInt(event.target.value, 10));
+            setPage(0);
+          }}
+        />
       </Card>
 
-      {/* Action Menu */}
       <CustomPopover
-        open={Boolean(anchorEl)}
-        anchorEl={anchorEl}
-        onClose={handleMenuClose}
-        slotProps={{
-          arrow: {
-            placement: 'right-center',
-            offset: 14,
-            size: 15,
-          },
-          paper: {
-            sx: {
-              borderRadius: 2,
-              boxShadow: (theme) => theme.shadows[6],
-              maxWidth: 140,
-            },
-          },
-        }}
+        open={Boolean(menu.anchorEl)}
+        anchorEl={menu.anchorEl}
+        onClose={closeMenu}
+        slotProps={{ arrow: { placement: 'right-top' } }}
       >
         <MenuList>
-          <MenuItem onClick={handleViewDetails}>
+          <MenuItem onClick={runFromMenu((o) => router.push(paths.dashboard.ownerDetails(o.id)))}>
             <VisibilityIcon fontSize="small" sx={{ mr: 1 }} />
             View
           </MenuItem>
+          <MenuItem onClick={runFromMenu((o) => router.push(paths.dashboard.ownerEdit(o.id)))}>
+            <EditIcon fontSize="small" sx={{ mr: 1 }} />
+            Edit
+          </MenuItem>
+
+          {menuOwner?.signup_status !== 'approved' && (
+            <MenuItem
+              onClick={runFromMenu((o) => actions.open('approve', o))}
+              sx={{ color: 'success.main' }}
+            >
+              <ApproveIcon fontSize="small" sx={{ mr: 1 }} />
+              Approve
+            </MenuItem>
+          )}
+          {menuOwner?.signup_status === 'pending' && (
+            <MenuItem
+              onClick={runFromMenu((o) => actions.open('reject', o))}
+              sx={{ color: 'error.main' }}
+            >
+              <RejectIcon fontSize="small" sx={{ mr: 1 }} />
+              Reject
+            </MenuItem>
+          )}
+
+          {menuOwner?.is_active === false ? (
+            <MenuItem onClick={runFromMenu((o) => actions.open('activate', o))}>
+              <ActivateIcon fontSize="small" sx={{ mr: 1 }} />
+              Reactivate
+            </MenuItem>
+          ) : (
+            <MenuItem onClick={runFromMenu((o) => actions.open('deactivate', o))}>
+              <DeactivateIcon fontSize="small" sx={{ mr: 1 }} />
+              Deactivate
+            </MenuItem>
+          )}
 
           <MenuItem
-            onClick={() => setDeleteDialog(true)}
+            onClick={runFromMenu((o) => actions.open('delete', o))}
             sx={{ color: 'error.main' }}
-            disabled={isDeleting}
           >
             <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
             Delete
@@ -537,36 +467,24 @@ const Page = () => {
         </MenuList>
       </CustomPopover>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Delete Owner and Company</DialogTitle>
-        <DialogContent>
-          <Typography sx={{ mb: 2 }}>
-            Are you sure you want to delete <strong>{selectedOwner?.name}</strong> and their
-            associated company <strong>{selectedOwner?.company}</strong>?
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            This action cannot be undone. Both the owner and company data will be permanently
-            removed.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialog(false)} variant="outlined" disabled={isDeleting}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteSingle}
-            color="error"
-            variant="contained"
-            disabled={isDeleting}
-            startIcon={isDeleting ? <CircularProgress size={16} /> : <DeleteIcon />}
-          >
-            {isDeleting ? 'Deleting...' : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <OwnerActionDialog actions={actions} />
     </Container>
   );
-};
+}
 
-export default Page;
+// ----------------------------------------------------------------------
+
+function FilterSelect({ label, value, options, onChange }) {
+  return (
+    <FormControl sx={{ minWidth: { md: 170 }, flexShrink: 0 }}>
+      <InputLabel>{label}</InputLabel>
+      <Select value={value} label={label} onChange={onChange}>
+        {options.map((option) => (
+          <MenuItem key={option.value} value={option.value}>
+            {option.label}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+}

@@ -10,6 +10,14 @@ export const endpoints = {
     logout: '/admin/auth/logout',
     me: '/admin/auth/me',
   },
+  // Workspace owners in the admin console (backend app/api/admin/owner_endpoints.py). Approving or
+  // rejecting a pending signup is a separate route (app/api/admin/signup_endpoints.py).
+  owners: {
+    list: '/admin/owners',
+    details: (id) => `/admin/owners/${encodeURIComponent(id)}`,
+    approve: (id) => `/admin/signups/${encodeURIComponent(id)}/approve`,
+    reject: (id) => `/admin/signups/${encodeURIComponent(id)}/reject`,
+  },
   company: {
     send_otp: '/company/company-owner/send-otp',
     verify_otp: '/company/company-owner/verify-otp',
