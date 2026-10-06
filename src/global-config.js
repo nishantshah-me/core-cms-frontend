@@ -4,14 +4,15 @@ import packageJson from '../package.json';
 
 // ----------------------------------------------------------------------
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://api-dev.hexafoldtech.com';
+// Same-origin path proxied to the backend by the rewrite in next.config.mjs; the real URL (API_URL) stays server-side.
+const API_PROXY_PATH = '/api-proxy';
 
 export const CONFIG = {
   appName: 'Minimal UI',
   appVersion: packageJson.version,
   serverUrl: process.env.NEXT_PUBLIC_SERVER_URL ?? '',
   /** HRMS backend: back-office login and the owner/company endpoints. */
-  apiUrl: API_URL.replace(/\/+$/, ''),
+  apiUrl: API_PROXY_PATH,
   assetsDir: process.env.NEXT_PUBLIC_ASSETS_DIR ?? '',
   isStaticExport: JSON.parse(process.env.BUILD_STATIC_EXPORT ?? 'false'),
   /**
