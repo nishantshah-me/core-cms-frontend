@@ -24,8 +24,7 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
 import HorizontalRuleIcon from '@mui/icons-material/HorizontalRule';
 
-import { previewMarkdown, uploadBlogImage } from 'src/auth/services/blogService';
-import { describeApiError } from 'src/auth/services/platformAdminService';
+import { previewMarkdown, uploadBlogImage, describeApiError } from 'src/auth/services/blogService';
 
 import { BlogProse } from './blog-prose';
 import { IMAGE_TYPES, MAX_IMAGE_BYTES } from './blog-utils';

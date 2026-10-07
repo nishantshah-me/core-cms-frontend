@@ -26,9 +26,9 @@ import {
   listBlogCategories,
   createBlogCategory,
   updateBlogCategory,
+  describeApiError,
   deleteBlogCategory,
 } from 'src/auth/services/blogService';
-import { describeApiError } from 'src/auth/services/platformAdminService';
 
 // ----------------------------------------------------------------------
 

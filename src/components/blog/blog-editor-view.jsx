@@ -28,8 +28,13 @@ import LockOpenIcon from '@mui/icons-material/LockOpen';
 
 import { paths } from 'src/routes/paths';
 import { Form, Field } from 'src/components/hook-form';
-import { getBlog, createBlog, updateBlog, listBlogCategories } from 'src/auth/services/blogService';
-import { describeApiError } from 'src/auth/services/platformAdminService';
+import {
+  getBlog,
+  createBlog,
+  updateBlog,
+  describeApiError,
+  listBlogCategories,
+} from 'src/auth/services/blogService';
 
 import { SeoCard, CharacterCounter } from './seo-card';
 import { PublishCard } from './publish-card';

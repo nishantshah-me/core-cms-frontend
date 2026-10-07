@@ -47,12 +47,13 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 
 import { paths } from 'src/routes/paths';
 import { Label } from 'src/components/label';
-import { getBlog, listBlogs, deleteBlog, listBlogCategories } from 'src/auth/services/blogService';
 import {
-  getAdminSession,
-  adminSignOut,
+  getBlog,
+  listBlogs,
+  deleteBlog,
   describeApiError,
-} from 'src/auth/services/platformAdminService';
+  listBlogCategories,
+} from 'src/auth/services/blogService';
 
 import { BlogProse } from './blog-prose';
 import { CategoriesDialog } from './categories-dialog';
@@ -87,7 +88,6 @@ function publishedCell(post) {
 
 export function BlogListView() {
   const router = useRouter();
-  const [admin, setAdmin] = useState(null);
 
   const [tab, setTab] = useState('ALL');
   const [searchInput, setSearchInput] = useState('');
@@ -110,8 +110,6 @@ export function BlogListView() {
   const [deleting, setDeleting] = useState(false);
   const [previewId, setPreviewId] = useState(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
-
-  useEffect(() => setAdmin(getAdminSession()?.admin || null), []);
 
   useEffect(() => {
     listBlogCategories().then(setCategories).catch(() => setCategories([]));
@@ -197,17 +195,7 @@ export function BlogListView() {
       </Breadcrumbs>
 
       <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2} sx={{ mb: 3 }}>
-        <Box>
-          <Typography variant="h4">Blog posts</Typography>
-          {admin && (
-            <Typography variant="body2" color="text.secondary">
-              Signed in as {admin.email} ·{' '}
-              <Link component="button" type="button" underline="always" onClick={adminSignOut}>
-                Sign out
-              </Link>
-            </Typography>
-          )}
-        </Box>
+        <Typography variant="h4">Blog posts</Typography>
         <Stack direction="row" spacing={1.5}>
           <Button variant="outlined" color="inherit" onClick={() => setCategoriesOpen(true)}>
             Categories

@@ -18,6 +18,16 @@ export const endpoints = {
     approve: (id) => `/admin/signups/${encodeURIComponent(id)}/approve`,
     reject: (id) => `/admin/signups/${encodeURIComponent(id)}/reject`,
   },
+  // Blog posts published to the marketing site's journal (backend app/api/cms_blog/admin_endpoints.py).
+  // Same admin identity and Bearer token as the rest of the console.
+  blogs: {
+    list: '/api/v1/admin/blogs',
+    details: (id) => `/api/v1/admin/blogs/${encodeURIComponent(id)}`,
+    uploadImage: '/api/v1/admin/blogs/upload-image',
+    preview: '/api/v1/admin/blogs/preview',
+    categories: '/api/v1/admin/blogs/categories',
+    category: (id) => `/api/v1/admin/blogs/categories/${encodeURIComponent(id)}`,
+  },
   company: {
     send_otp: '/company/company-owner/send-otp',
     verify_otp: '/company/company-owner/verify-otp',

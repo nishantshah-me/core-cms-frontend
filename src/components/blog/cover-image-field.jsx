@@ -12,8 +12,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 
 import { Field } from 'src/components/hook-form';
-import { uploadBlogImage } from 'src/auth/services/blogService';
-import { describeApiError } from 'src/auth/services/platformAdminService';
+import { uploadBlogImage, describeApiError } from 'src/auth/services/blogService';
 
 import { IMAGE_TYPES, MAX_IMAGE_BYTES, formatFileSize } from './blog-utils';
 

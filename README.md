@@ -38,15 +38,9 @@ To set up your local server:
 
 Writes the posts that appear on the public website's journal (`mis-react`, `/blog`). The data lives in the Officeous backend (`/api/v1/admin/blogs`), not Supabase.
 
-- **Sign-in**: the blog pages ask for a **platform admin** account (password + authenticator code), separate from this dashboard's Supabase login. Create one with `python -m app.scripts.create_platform_admin create ...` in the backend repo; the first sign-in enrols the authenticator. The session lives in `sessionStorage` (this tab only).
-- **Environment** (optional; defaults shown):
-
-  | Variable | Default | Purpose |
-  | --- | --- | --- |
-  | `NEXT_PUBLIC_API_BASE_URL` | `https://api-dev.hexafoldtech.com` | Backend that serves `/admin/auth` and `/api/v1/admin/blogs` |
-  | `NEXT_PUBLIC_MARKETING_SITE_URL` | `https://www.officeous.com` | Where posts are published; used for the SEO preview and "View live" links |
-
-- **Code**: pages in `src/app/dashboard/blogs/`, UI in `src/components/blog/`, API calls in `src/auth/services/{platformAdminService,blogService}.js`.
+- **Sign-in**: none of its own. The pages sit behind the dashboard's normal login, and their API calls (`/api/v1/admin/blogs`) use that same admin session, so anyone who can sign in to the dashboard can manage the blog. The backend still enforces its own permission check on every call.
+- **Environment** (optional): `NEXT_PUBLIC_MARKETING_SITE_URL` (default `https://www.officeous.com`) is where posts are published; it's used for the SEO preview and "View live" links. Requests reach the backend through the same `/api-proxy` rewrite as the rest of the console, so `API_URL` is the only backend setting.
+- **Code**: pages in `src/app/dashboard/blogs/`, UI in `src/components/blog/`, API calls in `src/auth/services/blogService.js` (routes in `src/api/endpoints.js`).
 
 ---
 
