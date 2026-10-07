@@ -50,7 +50,7 @@ const _workspaces_Officeous = [
       { title: 'App', path: paths.dashboard.root, icon: ICONS.dashboard },
       {
         title: 'Blogs',
-        path: paths.dashboard.three,
+        path: paths.dashboard.blogs.root,
         icon: ICONS.blog,
         // info: <Label>v{CONFIG.appVersion}</Label>,
       },

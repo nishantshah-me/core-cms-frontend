@@ -48,6 +48,11 @@ export const paths = {
     owners: `${ROOTS.DASHBOARD}/owners`,
     owners_Test: `${ROOTS.DASHBOARD}/owners-2`,
     company: `${ROOTS.DASHBOARD}/company`,
+    blogs: {
+      root: `${ROOTS.DASHBOARD}/blogs`,
+      new: `${ROOTS.DASHBOARD}/blogs/new`,
+      edit: (id) => `${ROOTS.DASHBOARD}/blogs/edit?id=${encodeURIComponent(id)}`,
+    },
     onboarding: `${ROOTS.DASHBOARD}/onboarding`,
     group: {
       root: `${ROOTS.DASHBOARD}/group`,

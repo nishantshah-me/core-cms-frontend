@@ -45,6 +45,7 @@
     "autosuggest-highlight": "^3.3.4",
     "axios": "^1.11.0",
     "dayjs": "^1.11.13",
+    "dompurify": "^3.4.16",
     "es-toolkit": "^1.39.8",
     "framer-motion": "^12.23.12",
     "lodash": "^4.17.21",

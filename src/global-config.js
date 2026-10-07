@@ -9,6 +9,19 @@ export const CONFIG = {
   appVersion: packageJson.version,
   serverUrl: process.env.NEXT_PUBLIC_SERVER_URL ?? '',
   assetsDir: process.env.NEXT_PUBLIC_ASSETS_DIR ?? '',
+  /**
+   * The Officeous backend (FastAPI) that serves /admin/auth and /api/v1/admin/blogs.
+   * The dev host is the fallback the other backend services in this app already use.
+   */
+  backendUrl: (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'https://api-dev.hexafoldtech.com').replace(
+    /\/+$/,
+    ''
+  ),
+  /** The public marketing site that blog posts are published to (/blog/<slug>). */
+  marketingSiteUrl: (process.env.NEXT_PUBLIC_MARKETING_SITE_URL ?? 'https://www.officeous.com').replace(
+    /\/+$/,
+    ''
+  ),
   isStaticExport: JSON.parse(process.env.BUILD_STATIC_EXPORT ?? 'false'),
   /**
    * Auth
