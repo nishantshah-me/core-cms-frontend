@@ -28,6 +28,15 @@ export const endpoints = {
     categories: '/api/v1/admin/blogs/categories',
     category: (id) => `/api/v1/admin/blogs/categories/${encodeURIComponent(id)}`,
   },
+  // Billing configuration (backend app/api/admin/billing_endpoints.py): the master switch, currencies, trial
+  // length, plans and per-seat prices, and creating the matching Razorpay plans.
+  billing: {
+    root: '/admin/billing',
+    settings: '/admin/billing/settings',
+    plan: (key) => `/admin/billing/plans/${encodeURIComponent(key)}`,
+    prices: (key) => `/admin/billing/plans/${encodeURIComponent(key)}/prices`,
+    razorpaySync: '/admin/billing/razorpay/sync',
+  },
   company: {
     send_otp: '/company/company-owner/send-otp',
     verify_otp: '/company/company-owner/verify-otp',

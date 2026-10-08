@@ -47,6 +47,7 @@ export const paths = {
     two: `${ROOTS.DASHBOARD}/two`,
     three: `${ROOTS.DASHBOARD}/three`,
     owners: `${ROOTS.DASHBOARD}/owners`,
+    billing: `${ROOTS.DASHBOARD}/billing`,
     ownerNew: `${ROOTS.DASHBOARD}/owners/create-owner`,
     ownerEdit: (id) => `${ROOTS.DASHBOARD}/owners/create-owner?owner_id=${encodeURIComponent(id)}`,
     ownerDetails: (id) =>
