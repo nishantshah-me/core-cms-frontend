@@ -23,7 +23,10 @@ import CardContent from '@mui/material/CardContent';
 import TableContainer from '@mui/material/TableContainer';
 import {
   Edit as EditIcon,
+  Logout as SignOutIcon,
   Delete as DeleteIcon,
+  LockReset as ResetPasswordIcon,
+  PhonelinkLock as TwoFactorIcon,
   Block as DeactivateIcon,
   LockOpen as ActivateIcon,
   ArrowBack as ArrowBackIcon,
@@ -42,6 +45,7 @@ import { getOwner, getErrorMessage } from 'src/auth/services/adminOwnerService';
 import { fOwnerDate, pluralize } from 'src/sections/owner/owner-utils';
 import { OwnerStatusLabel } from 'src/sections/owner/owner-status-label';
 import { OwnerActionDialog, useOwnerActions } from 'src/sections/owner/owner-actions';
+import { OwnerSupportDialog, useOwnerSupport } from 'src/sections/owner/owner-support-actions';
 
 // ----------------------------------------------------------------------
 
@@ -92,6 +96,8 @@ function OwnerDetailView() {
     // A deleted owner is gone from the console, so there is nothing left to show.
     onDone: (action) => (action === 'delete' ? router.push(paths.dashboard.owners) : load()),
   });
+
+  const support = useOwnerSupport({ onDone: load });
 
   if (loading) {
     return <LogoLoader sx={{ height: '80vh' }} />;
@@ -275,6 +281,49 @@ function OwnerDetailView() {
             </CardContent>
           </Card>
 
+          {!isPending && !isRejected && (
+            <Card>
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 0.5 }}>
+                  Support
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  For an owner who is locked out. Each action signs them out everywhere and is
+                  recorded in the audit log.
+                </Typography>
+                <Stack spacing={1}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="inherit"
+                    startIcon={<ResetPasswordIcon />}
+                    onClick={() => support.open('reset_password', owner)}
+                  >
+                    Reset password
+                  </Button>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="inherit"
+                    startIcon={<SignOutIcon />}
+                    onClick={() => support.open('sign_out', owner)}
+                  >
+                    Sign out everywhere
+                  </Button>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="error"
+                    startIcon={<TwoFactorIcon />}
+                    onClick={() => support.open('reset_2fa', owner)}
+                  >
+                    Reset two-factor
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2 }}>
@@ -302,6 +351,7 @@ function OwnerDetailView() {
       </Box>
 
       <OwnerActionDialog actions={actions} />
+      <OwnerSupportDialog support={support} />
     </Container>
   );
 }
@@ -395,9 +445,18 @@ function WorkspaceCard({ workspace }) {
               {workspace.subdomain || 'No subdomain'} · created {fOwnerDate(workspace.created_at)}
             </Typography>
           </Box>
-          <Label color={workspace.is_verified ? 'success' : 'default'}>
-            {workspace.is_verified ? 'Verified' : 'Unverified'}
-          </Label>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Label color={workspace.is_verified ? 'success' : 'default'}>
+              {workspace.is_verified ? 'Verified' : 'Unverified'}
+            </Label>
+            <Button
+              size="small"
+              component={RouterLink}
+              href={paths.dashboard.workspaceDetails(workspace.id)}
+            >
+              Open workspace
+            </Button>
+          </Stack>
         </Box>
 
         <Box sx={{ mt: 2 }}>

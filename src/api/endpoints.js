@@ -17,6 +17,39 @@ export const endpoints = {
     details: (id) => `/admin/owners/${encodeURIComponent(id)}`,
     approve: (id) => `/admin/signups/${encodeURIComponent(id)}/approve`,
     reject: (id) => `/admin/signups/${encodeURIComponent(id)}/reject`,
+    // Support actions (backend owner_endpoints.py); each one signs the owner out everywhere.
+    resetPassword: (id) => `/admin/owners/${encodeURIComponent(id)}/reset-password`,
+    signOut: (id) => `/admin/owners/${encodeURIComponent(id)}/sign-out`,
+    resetTwoFactor: (id) => `/admin/owners/${encodeURIComponent(id)}/reset-2fa`,
+  },
+  // Read-only platform reports (backend app/api/admin/analytics_endpoints.py): KPIs, growth, engagement, adoption,
+  // cohorts and the signup funnel.
+  analytics: {
+    overview: '/admin/analytics/overview',
+    growth: '/admin/analytics/growth',
+    distribution: '/admin/analytics/distribution',
+    engagement: '/admin/analytics/engagement',
+    adoption: '/admin/analytics/adoption',
+    cohorts: '/admin/analytics/cohorts',
+    funnel: '/admin/analytics/funnel',
+  },
+  // Workspaces and companies across every tenant (backend workspace_endpoints.py).
+  workspaces: {
+    list: '/admin/workspaces',
+    details: (id) => `/admin/workspaces/${encodeURIComponent(id)}`,
+    extendTrial: (id) => `/admin/workspaces/${encodeURIComponent(id)}/extend-trial`,
+  },
+  companies: { list: '/admin/companies' },
+  // Subscriptions, payments and the Razorpay event log (backend revenue_endpoints.py).
+  subscriptions: { list: '/admin/subscriptions' },
+  payments: { list: '/admin/payments' },
+  webhooks: { list: '/admin/webhooks' },
+  // The platform itself (backend platform_endpoints.py): audit log, system status, admin team and its sessions.
+  auditLogs: { list: '/admin/audit-logs' },
+  system: { status: '/admin/system/status' },
+  team: {
+    list: '/admin/team',
+    session: (id) => `/admin/team/sessions/${encodeURIComponent(id)}`,
   },
   // Blog posts published to the marketing site's journal (backend app/api/cms_blog/admin_endpoints.py).
   // Same admin identity and Bearer token as the rest of the console.
