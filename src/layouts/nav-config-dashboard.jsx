@@ -30,6 +30,8 @@ const ICONS = {
   invoice: icon('ic-invoice'),
   product: icon('ic-product'),
   calendar: icon('ic-calendar'),
+  company: icon('ic-company'),
+  health: icon('ic-health'),
   disabled: icon('ic-disabled'),
   external: icon('ic-external'),
   subpaths: icon('ic-subpaths'),
@@ -47,86 +49,57 @@ const _workspaces_Officeous = [
   {
     subheader: 'Overview',
     items: [
-      { title: 'App', path: paths.dashboard.root, icon: ICONS.dashboard },
+      { title: 'Overview', path: paths.dashboard.root, icon: ICONS.dashboard },
+      { title: 'Analytics', path: paths.dashboard.analytics, icon: ICONS.analytics },
+    ],
+  },
+  /** * Customers */
+  {
+    subheader: 'Customers',
+    items: [
+      { title: 'Owners', path: paths.dashboard.owners, icon: ICONS.user },
+      { title: 'Workspaces', path: paths.dashboard.workspaces, icon: ICONS.folder },
+      { title: 'Companies', path: paths.dashboard.companies, icon: ICONS.company },
+    ],
+  },
+  /** * Revenue */
+  {
+    subheader: 'Revenue',
+    items: [
+      { title: 'Subscriptions', path: paths.dashboard.subscriptions, icon: ICONS.order },
+      { title: 'Payments', path: paths.dashboard.payments, icon: ICONS.invoice },
+      { title: 'Billing setup', path: paths.dashboard.billing, icon: ICONS.banking },
+    ],
+  },
+  /** * Content */
+  {
+    subheader: 'Content',
+    items: [
       {
         title: 'Blogs',
         path: paths.dashboard.blogs.root,
         icon: ICONS.blog,
         // info: <Label>v{CONFIG.appVersion}</Label>,
       },
-      // { title: 'Jobs', path: paths.dashboard.two, icon: ICONS.ecommerce },
-      { title: 'Anayltics', path: paths.dashboard.three, icon: ICONS.analytics },
-      { title: 'Owners', path: paths.dashboard.owners, icon: ICONS.user },
-      { title: 'Billing', path: paths.dashboard.billing, icon: ICONS.banking },
       {
         title: 'Jobs',
         icon: ICONS.job,
         children: [
-          {
-            title: 'Recruiter',
-            path: '/dashboard/jobs/recruiters',
-            // children: [
-            //   { title: 'Level 2a', path: '#/dashboard/menu-level/1a/2a' },
-            //   {
-            //     title: 'Level 2b',
-            //     path: '#/dashboard/menu-level/1a/2b',
-            //     children: [
-            //       {
-            //         title: 'Level 3a',
-            //         path: '#/dashboard/menu-level/1a/2b/3a',
-            //       },
-            //       {
-            //         title: 'Level 3b',
-            //         path: '#/dashboard/menu-level/1a/2b/3b',
-            //       },
-            //     ],
-            //   },
-            // ],
-          },
-          {
-            title: 'Candidate List',
-            path: '/dashboard/jobs/candidates',
-            // children: [
-            //   { title: 'Level 2a', path: '#/dashboard/menu-level/1a/2a' },
-            //   {
-            //     title: 'Level 2b',
-            //     path: '#/dashboard/menu-level/1a/2b',
-            //     children: [
-            //       {
-            //         title: 'Level 3a',
-            //         path: '#/dashboard/menu-level/1a/2b/3a',
-            //       },
-            //       {
-            //         title: 'Level 3b',
-            //         path: '#/dashboard/menu-level/1a/2b/3b',
-            //       },
-            //     ],
-            //   },
-            // ],
-          },
+          { title: 'Recruiter', path: '/dashboard/jobs/recruiters' },
+          { title: 'Candidate List', path: '/dashboard/jobs/candidates' },
         ],
       },
-      // { title: 'Owners Test', path: paths.dashboard.owners_Test, icon: ICONS.user },
-      // { title: 'Company', path: paths.dashboard.company, icon: ICONS.course },
-      // { title: 'Onboarding', path: paths.dashboard.onboarding, icon: ICONS.course },
     ],
   },
-  /** * Management */
-  // {
-  //   subheader: 'Management',
-  //   items: [
-  //     {
-  //       title: 'Group',
-  //       path: paths.dashboard.group.root,
-  //       icon: ICONS.user,
-  //       children: [
-  //         { title: 'Four', path: paths.dashboard.group.root },
-  //         { title: 'Five', path: paths.dashboard.group.five },
-  //         { title: 'Six', path: paths.dashboard.group.six },
-  //       ],
-  //     },
-  //   ],
-  // },
+  /** * Platform */
+  {
+    subheader: 'Platform',
+    items: [
+      { title: 'Audit log', path: paths.dashboard.auditLogs, icon: ICONS.file },
+      { title: 'System health', path: paths.dashboard.system, icon: ICONS.health },
+      { title: 'Admin team', path: paths.dashboard.team, icon: ICONS.lock },
+    ],
+  },
   /** * Misc */
   {
     subheader: 'Misc',

@@ -48,6 +48,16 @@ export const paths = {
     three: `${ROOTS.DASHBOARD}/three`,
     owners: `${ROOTS.DASHBOARD}/owners`,
     billing: `${ROOTS.DASHBOARD}/billing`,
+    analytics: `${ROOTS.DASHBOARD}/analytics`,
+    workspaces: `${ROOTS.DASHBOARD}/workspaces`,
+    workspaceDetails: (id) =>
+      `${ROOTS.DASHBOARD}/workspaces/workspace-detail?workspace_id=${encodeURIComponent(id)}`,
+    companies: `${ROOTS.DASHBOARD}/companies`,
+    subscriptions: `${ROOTS.DASHBOARD}/subscriptions`,
+    payments: `${ROOTS.DASHBOARD}/payments`,
+    auditLogs: `${ROOTS.DASHBOARD}/audit-logs`,
+    system: `${ROOTS.DASHBOARD}/system`,
+    team: `${ROOTS.DASHBOARD}/team`,
     ownerNew: `${ROOTS.DASHBOARD}/owners/create-owner`,
     ownerEdit: (id) => `${ROOTS.DASHBOARD}/owners/create-owner?owner_id=${encodeURIComponent(id)}`,
     ownerDetails: (id) =>

@@ -2,8 +2,8 @@
 
 import lodash from 'lodash';
 import toast from 'react-hot-toast';
-import { useRouter } from 'next/navigation';
-import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useRef, useMemo, Suspense, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
@@ -104,8 +104,18 @@ const COLUMN_COUNT = 7;
 
 // ----------------------------------------------------------------------
 
+// Reads `?status=` from the URL (the dashboard links to the pending tab), which needs a Suspense boundary.
 export default function OwnersPage() {
+  return (
+    <Suspense fallback={null}>
+      <OwnersView />
+    </Suspense>
+  );
+}
+
+function OwnersView() {
   const router = useRouter();
+  const requestedStatus = useSearchParams().get('status');
 
   const [owners, setOwners] = useState([]);
   const [total, setTotal] = useState(0);
@@ -116,7 +126,9 @@ export default function OwnersPage() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const [status, setStatus] = useState('all');
+  const [status, setStatus] = useState(
+    STATUS_TABS.some((tab) => tab.value === requestedStatus) ? requestedStatus : 'all'
+  );
   const [searchInput, setSearchInput] = useState(''); // what is typed
   const [search, setSearch] = useState(''); // debounced; what the API gets
   const [month, setMonth] = useState('');
