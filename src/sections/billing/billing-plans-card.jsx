@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
@@ -27,7 +28,14 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
-import { Edit as EditIcon } from '@mui/icons-material';
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Add as AddIcon,
+  KeyboardArrowUp as ArrowUpIcon,
+  KeyboardArrowDown as ArrowDownIcon,
+  Check as CheckIcon,
+} from '@mui/icons-material';
 
 import { Label } from 'src/components/label';
 
@@ -90,10 +98,11 @@ function PlanSection({ plan, currencies, onChange, onEdit }) {
       <Stack
         direction="row"
         spacing={1.5}
-        sx={{ alignItems: 'center', mb: 1.5, flexWrap: 'wrap', rowGap: 0.5 }}
+        sx={{ alignItems: 'center', mb: 1, flexWrap: 'wrap', rowGap: 0.5 }}
       >
         <Typography variant="h6">{plan.name}</Typography>
         {plan.key !== plan.name.toLowerCase() && <Label>{plan.key}</Label>}
+        {plan.highlight && <Label color="info">{plan.highlight}</Label>}
         {!plan.is_active && <Label color="warning">Hidden</Label>}
         <Typography variant="body2" color="text.secondary">
           {plan.is_free
@@ -105,6 +114,34 @@ function PlanSection({ plan, currencies, onChange, onEdit }) {
           <EditIcon fontSize="small" />
         </IconButton>
       </Stack>
+
+      {plan.description && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          {plan.description}
+        </Typography>
+      )}
+
+      {Array.isArray(plan.features) && plan.features.length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          <Typography
+            variant="caption"
+            sx={{ color: 'text.secondary', fontWeight: 600, display: 'block', mb: 0.75 }}
+          >
+            Features ({plan.features.length}):
+          </Typography>
+          <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', gap: 0.75 }}>
+            {plan.features.map((feat, idx) => (
+              <Chip
+                key={idx}
+                size="small"
+                variant="outlined"
+                icon={<CheckIcon fontSize="small" />}
+                label={feat}
+              />
+            ))}
+          </Stack>
+        </Box>
+      )}
 
       {!plan.is_free && (
         <TableContainer>
@@ -245,8 +282,12 @@ function PriceRow({ plan, interval, intervalLabel, currency, price, onChange }) 
 
 function PlanDialog({ plan, onClose, onChange }) {
   const [name, setName] = useState(plan?.name ?? '');
+  const [description, setDescription] = useState(plan?.description ?? '');
+  const [highlight, setHighlight] = useState(plan?.highlight ?? '');
   const [seats, setSeats] = useState(plan?.max_seats ? String(plan.max_seats) : '');
   const [active, setActive] = useState(plan?.is_active ?? true);
+  const [features, setFeatures] = useState(plan?.features ? [...plan.features] : []);
+  const [newFeature, setNewFeature] = useState('');
   const [saving, setSaving] = useState(false);
 
   if (!plan) return null;
@@ -255,11 +296,58 @@ function PlanDialog({ plan, onClose, onChange }) {
   const seatsInvalid = seats !== '' && !/^[1-9]\d{0,6}$/.test(seats);
   const nameInvalid = name.trim() === '';
 
+  const handleAddFeature = () => {
+    const trimmed = newFeature.trim();
+    if (!trimmed) return;
+    setFeatures((prev) => [...prev, trimmed]);
+    setNewFeature('');
+  };
+
+  const handleRemoveFeature = (index) => {
+    setFeatures((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateFeature = (index, val) => {
+    setFeatures((prev) => prev.map((f, i) => (i === index ? val : f)));
+  };
+
+  const handleMoveFeature = (index, direction) => {
+    const target = index + direction;
+    if (target < 0 || target >= features.length) return;
+    setFeatures((prev) => {
+      const copy = [...prev];
+      const temp = copy[index];
+      copy[index] = copy[target];
+      copy[target] = temp;
+      return copy;
+    });
+  };
+
   const handleSave = async () => {
     const changes = {};
     if (name.trim() !== plan.name) changes.name = name.trim();
     if (maxSeats !== plan.max_seats) changes.max_seats = maxSeats;
     if (active !== plan.is_active) changes.is_active = active;
+
+    const trimmedDesc = description.trim();
+    if (trimmedDesc !== (plan.description ?? '')) {
+      changes.description = trimmedDesc || null;
+    }
+
+    const trimmedHighlight = highlight.trim();
+    if (trimmedHighlight !== (plan.highlight ?? '')) {
+      changes.highlight = trimmedHighlight || null;
+    }
+
+    const cleanedFeatures = features.map((f) => f.trim()).filter(Boolean);
+    const originalFeatures = plan.features ?? [];
+    const featuresChanged =
+      cleanedFeatures.length !== originalFeatures.length ||
+      cleanedFeatures.some((f, i) => f !== originalFeatures[i]);
+
+    if (featuresChanged) {
+      changes.features = cleanedFeatures;
+    }
 
     if (Object.keys(changes).length === 0) {
       onClose();
@@ -279,10 +367,10 @@ function PlanDialog({ plan, onClose, onChange }) {
   };
 
   return (
-    <Dialog open onClose={saving ? undefined : onClose} fullWidth maxWidth="xs">
+    <Dialog open onClose={saving ? undefined : onClose} fullWidth maxWidth="sm">
       <DialogTitle>Edit {plan.name} plan</DialogTitle>
 
-      <DialogContent>
+      <DialogContent dividers sx={{ maxHeight: '70vh' }}>
         <Stack spacing={2.5} sx={{ pt: 1 }}>
           <TextField
             label="Name"
@@ -290,6 +378,24 @@ function PlanDialog({ plan, onClose, onChange }) {
             error={nameInvalid}
             onChange={(event) => setName(event.target.value)}
             slotProps={{ htmlInput: { maxLength: 60 } }}
+          />
+          <TextField
+            label="Description"
+            multiline
+            rows={2}
+            value={description}
+            placeholder="Brief explanation of who this plan is for..."
+            onChange={(event) => setDescription(event.target.value)}
+            helperText="Shown on public pricing and in-app checkout."
+            slotProps={{ htmlInput: { maxLength: 500 } }}
+          />
+          <TextField
+            label="Highlight / Badge (Optional)"
+            value={highlight}
+            placeholder="e.g. Room to grow, Most Popular, Advanced capabilities"
+            onChange={(event) => setHighlight(event.target.value)}
+            helperText="Highlighted ribbon or badge displayed on the pricing card."
+            slotProps={{ htmlInput: { maxLength: 100 } }}
           />
           <TextField
             label="Seat limit"
@@ -318,6 +424,105 @@ function PlanDialog({ plan, onClose, onChange }) {
               />
             }
           />
+
+          <Divider />
+
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+              Plan Features ({features.length})
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Manage feature bullet points displayed on pricing and upgrade screens.
+            </Typography>
+
+            <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Enter a new feature, e.g. Attendance tracking..."
+                value={newFeature}
+                onChange={(e) => setNewFeature(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddFeature();
+                  }
+                }}
+              />
+              <Button
+                variant="contained"
+                onClick={handleAddFeature}
+                disabled={!newFeature.trim()}
+                startIcon={<AddIcon />}
+                sx={{ whiteSpace: 'nowrap' }}
+              >
+                Add
+              </Button>
+            </Stack>
+
+            <Stack spacing={1}>
+              {features.map((feat, idx) => (
+                <Stack
+                  key={idx}
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{
+                    p: 1,
+                    borderRadius: 1,
+                    bgcolor: (theme) => theme.palette.action.hover,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{ minWidth: 20, color: 'text.secondary', fontWeight: 600 }}
+                  >
+                    {idx + 1}.
+                  </Typography>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    value={feat}
+                    onChange={(e) => handleUpdateFeature(idx, e.target.value)}
+                  />
+                  <IconButton
+                    size="small"
+                    disabled={idx === 0}
+                    onClick={() => handleMoveFeature(idx, -1)}
+                    aria-label="Move feature up"
+                  >
+                    <ArrowUpIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    disabled={idx === features.length - 1}
+                    onClick={() => handleMoveFeature(idx, 1)}
+                    aria-label="Move feature down"
+                  >
+                    <ArrowDownIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => handleRemoveFeature(idx)}
+                    aria-label="Delete feature"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              ))}
+              {features.length === 0 && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ fontStyle: 'italic', py: 1 }}
+                >
+                  No features added yet. Add feature bullet points using the input above.
+                </Typography>
+              )}
+            </Stack>
+          </Box>
+
           <Typography variant="caption" color="text.secondary">
             Plan key: {plan.key}
           </Typography>
