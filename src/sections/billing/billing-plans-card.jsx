@@ -1,7 +1,7 @@
 'use client';
 
 import toast from 'react-hot-toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -28,13 +28,13 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
+import Tooltip from '@mui/material/Tooltip';
+import Paper from '@mui/material/Paper';
 import {
   Edit as EditIcon,
-  Delete as DeleteIcon,
-  Add as AddIcon,
-  KeyboardArrowUp as ArrowUpIcon,
-  KeyboardArrowDown as ArrowDownIcon,
   Check as CheckIcon,
+  CheckCircle as CheckCircleIcon,
+  RadioButtonUnchecked as UncheckedIcon,
 } from '@mui/icons-material';
 
 import { Label } from 'src/components/label';
@@ -51,11 +51,135 @@ import { INTERVALS, inputToMinor, minorToInput } from './billing-utils';
 
 const CURRENCY_SYMBOLS = { INR: '₹', USD: '$' };
 
+const DEFAULT_CATALOG = [
+  {
+    key: 'employee_directory',
+    name: 'Employee Directory & Profiles',
+    category: 'HR & People',
+    description:
+      'Employee directory, comprehensive personal profiles, contact details, and organization tree.',
+  },
+  {
+    key: 'onboarding_lifecycle',
+    name: 'Employee Onboarding & Offboarding',
+    category: 'HR & People',
+    description:
+      'Digital onboarding checklists, resignation submissions, notice period tracking, and exit clearance.',
+  },
+  {
+    key: 'document_management',
+    name: 'Document Management',
+    category: 'HR & People',
+    description:
+      'Employee documents, contracts, identification uploads, policy handbooks, and expiry tracking.',
+  },
+  {
+    key: 'attendance_tracking',
+    name: 'Attendance Tracking & Biometric',
+    category: 'Time & Attendance',
+    description:
+      'Daily clock-in/out, biometric sync, geo-fencing, shift rosters, and work hours computation.',
+  },
+  {
+    key: 'leave_management',
+    name: 'Leave Management & Balances',
+    category: 'Time & Attendance',
+    description:
+      'Leave application workflows, multi-type balance tracking, public holidays, and sandwich policies.',
+  },
+  {
+    key: 'advanced_leave_approvals',
+    name: 'Multi-Level Leave Approvals',
+    category: 'Time & Attendance',
+    description:
+      'Hierarchical manager approvals, delegation rules, and automated escalation pathways.',
+  },
+  {
+    key: 'time_tracker',
+    name: 'Work & Project Time Tracker',
+    category: 'Time & Attendance',
+    description:
+      'Live task timer, manual timesheet logging, billable vs non-billable tracking, and activity analysis.',
+  },
+  {
+    key: 'projects_tasks',
+    name: 'Projects & Task Management',
+    category: 'Projects & Operations',
+    description:
+      'Project boards, task assignments, milestones, deadlines, status columns, and Kanban workflow.',
+  },
+  {
+    key: 'task_templates',
+    name: 'Task Templates & Automation',
+    category: 'Projects & Operations',
+    description:
+      'Reusable sprint templates, recurring checklist setups, and auto-generated project deliverables.',
+  },
+  {
+    key: 'payroll_structure',
+    name: 'Salary Structures & Components',
+    category: 'Payroll & Compensation',
+    description:
+      'Earnings, allowances, deductions, PF, ESI, TDS brackets, and customizable CTC templates.',
+  },
+  {
+    key: 'payroll_processing',
+    name: 'Payroll Processing & Payslips',
+    category: 'Payroll & Compensation',
+    description:
+      'One-click monthly payroll runs, automated payslip PDF generation, and salary disbursements.',
+  },
+  {
+    key: 'asset_management',
+    name: 'Company Asset Inventory',
+    category: 'Asset Management',
+    description:
+      'Hardware and software tracking, serial numbers, warranty logs, and employee assignments.',
+  },
+  {
+    key: 'asset_maintenance',
+    name: 'Asset Maintenance & Depreciation',
+    category: 'Asset Management',
+    description:
+      'Repair logs, scheduled servicing schedules, vendor warranties, and asset depreciation accounting.',
+  },
+  {
+    key: 'accounts_invoicing',
+    name: 'Invoicing & Client Billing',
+    category: 'Finance & Accounts',
+    description:
+      'Client invoice generation, tax line items (GST/VAT), payment receipts, and payment status.',
+  },
+  {
+    key: 'accounts_ledger',
+    name: 'Financial Ledger & Expenses',
+    category: 'Finance & Accounts',
+    description:
+      'Chart of accounts, petty cash tracking, company expenditures, and financial summaries.',
+  },
+  {
+    key: 'role_permissions',
+    name: 'Custom Roles & Granular Permissions',
+    category: 'Administration & Security',
+    description:
+      'Role-based access controls (RBAC), custom role creation, and view/edit/delete scopes.',
+  },
+  {
+    key: 'device_security_audit',
+    name: 'Device Security & Audit Logs',
+    category: 'Administration & Security',
+    description:
+      'Trusted device binding, multi-factor authentication enforcement, and comprehensive audit trail.',
+  },
+];
+
 // ----------------------------------------------------------------------
 
 /** Every plan with its seat limit and the per-seat price for each interval and currency. */
 export function BillingPlansCard({ data, onChange }) {
   const [editing, setEditing] = useState(null);
+
+  const catalog = data?.feature_catalog?.length ? data.feature_catalog : DEFAULT_CATALOG;
 
   return (
     <Card>
@@ -70,6 +194,7 @@ export function BillingPlansCard({ data, onChange }) {
             <PlanSection
               key={plan.key}
               plan={plan}
+              catalog={catalog}
               currencies={data.supported_currencies}
               onChange={onChange}
               onEdit={() => setEditing(plan)}
@@ -81,6 +206,7 @@ export function BillingPlansCard({ data, onChange }) {
       <PlanDialog
         key={editing?.key ?? 'none'}
         plan={editing}
+        catalog={catalog}
         onClose={() => setEditing(null)}
         onChange={onChange}
       />
@@ -90,8 +216,19 @@ export function BillingPlansCard({ data, onChange }) {
 
 // ----------------------------------------------------------------------
 
-function PlanSection({ plan, currencies, onChange, onEdit }) {
+function PlanSection({ plan, catalog, currencies, onChange, onEdit }) {
   const seats = plan.max_seats ? `Up to ${plan.max_seats} seats` : 'Unlimited seats';
+  const catalogList = catalog?.length ? catalog : DEFAULT_CATALOG;
+
+  const catalogMap = useMemo(() => {
+    const map = {};
+    catalogList.forEach((f) => {
+      map[f.key] = f;
+    });
+    return map;
+  }, [catalogList]);
+
+  const activeFeatures = Array.isArray(plan.features) ? plan.features : [];
 
   return (
     <Box>
@@ -110,9 +247,15 @@ function PlanSection({ plan, currencies, onChange, onEdit }) {
             : `${seats} (paid plans are limited by seats bought)`}
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
-        <IconButton onClick={onEdit} aria-label={`Edit ${plan.name} plan`}>
-          <EditIcon fontSize="small" />
-        </IconButton>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<EditIcon fontSize="small" />}
+          onClick={onEdit}
+          aria-label={`Edit ${plan.name} plan`}
+        >
+          Edit Plan & Features
+        </Button>
       </Stack>
 
       {plan.description && (
@@ -121,27 +264,53 @@ function PlanSection({ plan, currencies, onChange, onEdit }) {
         </Typography>
       )}
 
-      {Array.isArray(plan.features) && plan.features.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography
-            variant="caption"
-            sx={{ color: 'text.secondary', fontWeight: 600, display: 'block', mb: 0.75 }}
-          >
-            Features ({plan.features.length}):
+      {/* Feature Catalog Badges */}
+      <Box sx={{ mb: 2 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+            Features ({activeFeatures.length} / {catalogList.length} enabled):
           </Typography>
+          {activeFeatures.length === catalogList.length && (
+            <Label color="success" size="small">
+              All Features Active
+            </Label>
+          )}
+          {activeFeatures.length === 0 && (
+            <Label color="default" size="small">
+              None Enabled
+            </Label>
+          )}
+        </Stack>
+
+        {activeFeatures.length > 0 ? (
           <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', gap: 0.75 }}>
-            {plan.features.map((feat, idx) => (
-              <Chip
-                key={idx}
-                size="small"
-                variant="outlined"
-                icon={<CheckIcon fontSize="small" />}
-                label={feat}
-              />
-            ))}
+            {activeFeatures.map((featKey) => {
+              const featInfo = catalogMap[featKey];
+              const labelText = featInfo ? featInfo.name : featKey;
+              return (
+                <Tooltip
+                  key={featKey}
+                  title={featInfo?.description || featKey}
+                  arrow
+                  placement="top"
+                >
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    icon={<CheckIcon fontSize="small" />}
+                    label={labelText}
+                  />
+                </Tooltip>
+              );
+            })}
           </Stack>
-        </Box>
-      )}
+        ) : (
+          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+            No features enabled for this plan. Click Edit Plan & Features to toggle features.
+          </Typography>
+        )}
+      </Box>
 
       {!plan.is_free && (
         <TableContainer>
@@ -280,14 +449,23 @@ function PriceRow({ plan, interval, intervalLabel, currency, price, onChange }) 
 
 // ----------------------------------------------------------------------
 
-function PlanDialog({ plan, onClose, onChange }) {
+function PlanDialog({ plan, catalog, onClose, onChange }) {
   const [name, setName] = useState(plan?.name ?? '');
   const [description, setDescription] = useState(plan?.description ?? '');
   const [highlight, setHighlight] = useState(plan?.highlight ?? '');
   const [seats, setSeats] = useState(plan?.max_seats ? String(plan.max_seats) : '');
   const [active, setActive] = useState(plan?.is_active ?? true);
-  const [features, setFeatures] = useState(plan?.features ? [...plan.features] : []);
-  const [newFeature, setNewFeature] = useState('');
+
+  const catalogList = catalog?.length ? catalog : DEFAULT_CATALOG;
+
+  // Track enabled feature keys using Set
+  const [enabledKeys, setEnabledKeys] = useState(() => {
+    if (Array.isArray(plan?.features)) {
+      return new Set(plan.features);
+    }
+    return new Set();
+  });
+
   const [saving, setSaving] = useState(false);
 
   if (!plan) return null;
@@ -296,31 +474,50 @@ function PlanDialog({ plan, onClose, onChange }) {
   const seatsInvalid = seats !== '' && !/^[1-9]\d{0,6}$/.test(seats);
   const nameInvalid = name.trim() === '';
 
-  const handleAddFeature = () => {
-    const trimmed = newFeature.trim();
-    if (!trimmed) return;
-    setFeatures((prev) => [...prev, trimmed]);
-    setNewFeature('');
-  };
-
-  const handleRemoveFeature = (index) => {
-    setFeatures((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleUpdateFeature = (index, val) => {
-    setFeatures((prev) => prev.map((f, i) => (i === index ? val : f)));
-  };
-
-  const handleMoveFeature = (index, direction) => {
-    const target = index + direction;
-    if (target < 0 || target >= features.length) return;
-    setFeatures((prev) => {
-      const copy = [...prev];
-      const temp = copy[index];
-      copy[index] = copy[target];
-      copy[target] = temp;
-      return copy;
+  // Group catalog by category
+  const categories = useMemo(() => {
+    const map = {};
+    catalogList.forEach((feat) => {
+      const cat = feat.category || 'General';
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(feat);
     });
+    return Object.entries(map).map(([category, items]) => ({
+      category,
+      items,
+      enabledCount: items.filter((f) => enabledKeys.has(f.key)).length,
+    }));
+  }, [catalogList, enabledKeys]);
+
+  const toggleFeature = (key) => {
+    setEnabledKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const setCategoryState = (items, targetState) => {
+    setEnabledKeys((prev) => {
+      const next = new Set(prev);
+      items.forEach((item) => {
+        if (targetState) next.add(item.key);
+        else next.delete(item.key);
+      });
+      return next;
+    });
+  };
+
+  const handleEnableAll = () => {
+    setEnabledKeys(new Set(catalogList.map((f) => f.key)));
+  };
+
+  const handleDisableAll = () => {
+    setEnabledKeys(new Set());
   };
 
   const handleSave = async () => {
@@ -339,14 +536,23 @@ function PlanDialog({ plan, onClose, onChange }) {
       changes.highlight = trimmedHighlight || null;
     }
 
-    const cleanedFeatures = features.map((f) => f.trim()).filter(Boolean);
+    // Preserve order defined in the catalog for selected keys
+    const newFeaturesArray = catalogList.filter((f) => enabledKeys.has(f.key)).map((f) => f.key);
+
+    // Keep any non-catalog keys that were already present
     const originalFeatures = plan.features ?? [];
+    originalFeatures.forEach((feat) => {
+      if (!catalogList.some((c) => c.key === feat) && enabledKeys.has(feat)) {
+        newFeaturesArray.push(feat);
+      }
+    });
+
     const featuresChanged =
-      cleanedFeatures.length !== originalFeatures.length ||
-      cleanedFeatures.some((f, i) => f !== originalFeatures[i]);
+      newFeaturesArray.length !== originalFeatures.length ||
+      newFeaturesArray.some((f, i) => f !== originalFeatures[i]);
 
     if (featuresChanged) {
-      changes.features = cleanedFeatures;
+      changes.features = newFeaturesArray;
     }
 
     if (Object.keys(changes).length === 0) {
@@ -366,165 +572,276 @@ function PlanDialog({ plan, onClose, onChange }) {
     }
   };
 
-  return (
-    <Dialog open onClose={saving ? undefined : onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Edit {plan.name} plan</DialogTitle>
+  const totalEnabled = enabledKeys.size;
+  const totalCatalog = catalogList.length;
 
-      <DialogContent dividers sx={{ maxHeight: '70vh' }}>
-        <Stack spacing={2.5} sx={{ pt: 1 }}>
-          <TextField
-            label="Name"
-            value={name}
-            error={nameInvalid}
-            onChange={(event) => setName(event.target.value)}
-            slotProps={{ htmlInput: { maxLength: 60 } }}
-          />
-          <TextField
-            label="Description"
-            multiline
-            rows={2}
-            value={description}
-            placeholder="Brief explanation of who this plan is for..."
-            onChange={(event) => setDescription(event.target.value)}
-            helperText="Shown on public pricing and in-app checkout."
-            slotProps={{ htmlInput: { maxLength: 500 } }}
-          />
-          <TextField
-            label="Highlight / Badge (Optional)"
-            value={highlight}
-            placeholder="e.g. Room to grow, Most Popular, Advanced capabilities"
-            onChange={(event) => setHighlight(event.target.value)}
-            helperText="Highlighted ribbon or badge displayed on the pricing card."
-            slotProps={{ htmlInput: { maxLength: 100 } }}
-          />
-          <TextField
-            label="Seat limit"
-            value={seats}
-            error={seatsInvalid}
-            placeholder="Unlimited"
-            onChange={(event) => setSeats(event.target.value.trim())}
-            helperText={
-              seatsInvalid
-                ? 'Enter a whole number, or leave blank for unlimited.'
-                : plan.is_free
-                  ? 'Most seats a workspace on this plan can have. Blank = unlimited.'
-                  : 'Paid plans are limited by the seats bought; blank = no plan-level limit.'
-            }
-            slotProps={{ htmlInput: { inputMode: 'numeric' } }}
-          />
-          <FormControlLabel
-            label={
-              plan.protected ? 'Shown to customers (always on for this plan)' : 'Shown to customers'
-            }
-            control={
-              <Switch
-                checked={active}
-                disabled={plan.protected}
-                onChange={(event) => setActive(event.target.checked)}
+  return (
+    <Dialog open onClose={saving ? undefined : onClose} fullWidth maxWidth="md">
+      <DialogTitle>Edit {plan.name} Plan & Features</DialogTitle>
+
+      <DialogContent dividers sx={{ maxHeight: '78vh' }}>
+        <Stack spacing={3} sx={{ pt: 1 }}>
+          {/* Plan Meta Information */}
+          <Box>
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 700, mb: 1.5, color: 'text.primary' }}
+            >
+              Basic Plan Details
+            </Typography>
+            <Stack spacing={2}>
+              <TextField
+                label="Name"
+                value={name}
+                error={nameInvalid}
+                onChange={(event) => setName(event.target.value)}
+                slotProps={{ htmlInput: { maxLength: 60 } }}
               />
-            }
-          />
+              <TextField
+                label="Description"
+                multiline
+                rows={2}
+                value={description}
+                placeholder="Brief explanation of who this plan is for..."
+                onChange={(event) => setDescription(event.target.value)}
+                helperText="Shown on public pricing and in-app checkout."
+                slotProps={{ htmlInput: { maxLength: 500 } }}
+              />
+              <TextField
+                label="Highlight / Badge (Optional)"
+                value={highlight}
+                placeholder="e.g. Room to grow, Most Popular, Advanced capabilities"
+                onChange={(event) => setHighlight(event.target.value)}
+                helperText="Highlighted ribbon or badge displayed on the pricing card."
+                slotProps={{ htmlInput: { maxLength: 100 } }}
+              />
+              <TextField
+                label="Seat limit"
+                value={seats}
+                error={seatsInvalid}
+                placeholder="Unlimited"
+                onChange={(event) => setSeats(event.target.value.trim())}
+                helperText={
+                  seatsInvalid
+                    ? 'Enter a whole number, or leave blank for unlimited.'
+                    : plan.is_free
+                      ? 'Most seats a workspace on this plan can have. Blank = unlimited.'
+                      : 'Paid plans are limited by the seats bought; blank = no plan-level limit.'
+                }
+                slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+              />
+              <FormControlLabel
+                label={
+                  plan.protected
+                    ? 'Shown to customers (always on for this plan)'
+                    : 'Shown to customers'
+                }
+                control={
+                  <Switch
+                    checked={active}
+                    disabled={plan.protected}
+                    onChange={(event) => setActive(event.target.checked)}
+                  />
+                }
+              />
+            </Stack>
+          </Box>
 
           <Divider />
 
+          {/* Feature Catalog Switches */}
           <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
-              Plan Features ({features.length})
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Manage feature bullet points displayed on pricing and upgrade screens.
-            </Typography>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ mb: 1, flexWrap: 'wrap', gap: 1 }}
+            >
+              <div>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                  Feature Catalog & Permissions
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Toggle features ON or OFF for this plan. Disabled features will be locked in the
+                  backend API and gated in the user interface.
+                </Typography>
+              </div>
 
-            <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="Enter a new feature, e.g. Attendance tracking..."
-                value={newFeature}
-                onChange={(e) => setNewFeature(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddFeature();
-                  }
-                }}
-              />
-              <Button
-                variant="contained"
-                onClick={handleAddFeature}
-                disabled={!newFeature.trim()}
-                startIcon={<AddIcon />}
-                sx={{ whiteSpace: 'nowrap' }}
-              >
-                Add
-              </Button>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Chip
+                  color={totalEnabled > 0 ? 'primary' : 'default'}
+                  label={`${totalEnabled} / ${totalCatalog} Enabled`}
+                  size="small"
+                />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={handleEnableAll}
+                  disabled={totalEnabled === totalCatalog}
+                >
+                  Enable All
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="inherit"
+                  onClick={handleDisableAll}
+                  disabled={totalEnabled === 0}
+                >
+                  Disable All
+                </Button>
+              </Stack>
             </Stack>
 
-            <Stack spacing={1}>
-              {features.map((feat, idx) => (
-                <Stack
-                  key={idx}
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  sx={{
-                    p: 1,
-                    borderRadius: 1,
-                    bgcolor: (theme) => theme.palette.action.hover,
-                  }}
-                >
-                  <Typography
-                    variant="caption"
-                    sx={{ minWidth: 20, color: 'text.secondary', fontWeight: 600 }}
+            {/* Categories */}
+            <Stack spacing={2.5} sx={{ mt: 2 }}>
+              {categories.map(({ category, items, enabledCount }) => {
+                const allCategoryEnabled = enabledCount === items.length;
+                const noneCategoryEnabled = enabledCount === 0;
+
+                return (
+                  <Paper
+                    key={category}
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      borderRadius: 1.5,
+                      borderColor: (theme) =>
+                        enabledCount > 0
+                          ? theme.palette.divider
+                          : theme.palette.action.disabledBackground,
+                    }}
                   >
-                    {idx + 1}.
-                  </Typography>
-                  <TextField
-                    size="small"
-                    fullWidth
-                    value={feat}
-                    onChange={(e) => handleUpdateFeature(idx, e.target.value)}
-                  />
-                  <IconButton
-                    size="small"
-                    disabled={idx === 0}
-                    onClick={() => handleMoveFeature(idx, -1)}
-                    aria-label="Move feature up"
-                  >
-                    <ArrowUpIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    disabled={idx === features.length - 1}
-                    onClick={() => handleMoveFeature(idx, 1)}
-                    aria-label="Move feature down"
-                  >
-                    <ArrowDownIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => handleRemoveFeature(idx)}
-                    aria-label="Delete feature"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
-              ))}
-              {features.length === 0 && (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ fontStyle: 'italic', py: 1 }}
-                >
-                  No features added yet. Add feature bullet points using the input above.
-                </Typography>
-              )}
+                    {/* Category Header */}
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      justifyContent="space-between"
+                      sx={{ mb: 1.5 }}
+                    >
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                          {category}
+                        </Typography>
+                        <Label
+                          color={
+                            allCategoryEnabled
+                              ? 'success'
+                              : enabledCount > 0
+                                ? 'primary'
+                                : 'default'
+                          }
+                          size="small"
+                        >
+                          {enabledCount} / {items.length} active
+                        </Label>
+                      </Stack>
+
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() => setCategoryState(items, !allCategoryEnabled)}
+                        sx={{ fontSize: '0.75rem', py: 0.25 }}
+                      >
+                        {allCategoryEnabled ? 'Turn Off Category' : 'Turn On Category'}
+                      </Button>
+                    </Stack>
+
+                    {/* Features in this category */}
+                    <Stack
+                      spacing={1}
+                      divider={<Divider flexItem sx={{ borderStyle: 'dashed' }} />}
+                    >
+                      {items.map((feat) => {
+                        const isEnabled = enabledKeys.has(feat.key);
+
+                        return (
+                          <Box
+                            key={feat.key}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              py: 0.75,
+                              px: 1,
+                              borderRadius: 1,
+                              bgcolor: isEnabled
+                                ? (theme) => theme.palette.action.hover
+                                : 'transparent',
+                              transition: 'background-color 0.15s ease',
+                            }}
+                          >
+                            <Box sx={{ pr: 2, flexGrow: 1 }}>
+                              <Stack
+                                direction="row"
+                                spacing={1}
+                                alignItems="center"
+                                sx={{ mb: 0.25 }}
+                              >
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    fontWeight: isEnabled ? 600 : 400,
+                                    color: isEnabled ? 'text.primary' : 'text.secondary',
+                                  }}
+                                >
+                                  {feat.name}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    fontFamily: 'monospace',
+                                    color: 'text.disabled',
+                                    fontSize: '0.7rem',
+                                  }}
+                                >
+                                  {feat.key}
+                                </Typography>
+                              </Stack>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ display: 'block' }}
+                              >
+                                {feat.description}
+                              </Typography>
+                            </Box>
+
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={isEnabled}
+                                  onChange={() => toggleFeature(feat.key)}
+                                  color="primary"
+                                />
+                              }
+                              label={
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    minWidth: 50,
+                                    fontWeight: isEnabled ? 600 : 400,
+                                    color: isEnabled ? 'primary.main' : 'text.disabled',
+                                  }}
+                                >
+                                  {isEnabled ? 'ON' : 'OFF'}
+                                </Typography>
+                              }
+                              labelPlacement="start"
+                              sx={{ mr: 0 }}
+                            />
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  </Paper>
+                );
+              })}
             </Stack>
           </Box>
 
           <Typography variant="caption" color="text.secondary">
-            Plan key: {plan.key}
+            Plan identifier: <code>{plan.key}</code>
           </Typography>
         </Stack>
       </DialogContent>
@@ -539,7 +856,7 @@ function PlanDialog({ plan, onClose, onChange }) {
           disabled={saving || seatsInvalid || nameInvalid}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}
         >
-          Save
+          Save Plan & Feature Changes
         </Button>
       </DialogActions>
     </Dialog>
