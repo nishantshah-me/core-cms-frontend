@@ -53,7 +53,7 @@ function intervalText(subscription) {
 
 // ── Subscription ─────────────────────────────────────────────────────────
 
-export function SubscriptionCard({ workspace }) {
+export function SubscriptionCard({ workspace, onChangePlan }) {
   const { subscription } = workspace;
   const lapsed = subscription.stored_status && subscription.stored_status !== subscription.status;
   const trialDays = subscription.trial_days_left;
@@ -64,6 +64,13 @@ export function SubscriptionCard({ workspace }) {
       <CardHeader
         title="Subscription"
         subheader="What this workspace is on and what it pays"
+        action={
+          onChangePlan ? (
+            <Button size="small" variant="outlined" onClick={onChangePlan}>
+              Change plan
+            </Button>
+          ) : undefined
+        }
         slotProps={cardHeaderSlots}
         sx={{ pb: 1 }}
       />

@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography';
 import {
   Refresh as RefreshIcon,
   MoreTime as ExtendIcon,
+  SwapHoriz as ChangePlanIcon,
   VerifiedOutlined as VerifiedIcon,
 } from '@mui/icons-material';
 
@@ -42,6 +43,7 @@ import {
   WorkspaceAuditCard,
 } from './workspace-cards';
 import { ExtendTrialDialog } from './extend-trial-dialog';
+import { ChangePlanDialog } from './change-plan-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -60,6 +62,7 @@ export function WorkspaceDetailView() {
   const workspace = report.data;
 
   const [extending, setExtending] = useState(false);
+  const [changingPlan, setChangingPlan] = useState(false);
   const support = useOwnerSupport({ onDone: report.reload });
 
   const trail = [
@@ -105,9 +108,19 @@ export function WorkspaceDetailView() {
                 </Label>
               </>
             )}
-            {workspace && canExtendTrial(workspace) && (
+            {workspace && (
               <Button
                 variant="contained"
+                startIcon={<ChangePlanIcon />}
+                onClick={() => setChangingPlan(true)}
+              >
+                Change plan
+              </Button>
+            )}
+            {workspace && canExtendTrial(workspace) && (
+              <Button
+                variant="outlined"
+                color="inherit"
                 startIcon={<ExtendIcon />}
                 onClick={() => setExtending(true)}
               >
@@ -189,7 +202,7 @@ export function WorkspaceDetailView() {
 
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, lg: 6 }}>
-              <SubscriptionCard workspace={workspace} />
+              <SubscriptionCard workspace={workspace} onChangePlan={() => setChangingPlan(true)} />
             </Grid>
             <Grid size={{ xs: 12, lg: 6 }}>
               <OwnerCard workspace={workspace} support={support} />
@@ -226,6 +239,12 @@ export function WorkspaceDetailView() {
             open={extending}
             onClose={() => setExtending(false)}
             onExtended={report.reload}
+          />
+          <ChangePlanDialog
+            workspace={workspace}
+            open={changingPlan}
+            onClose={() => setChangingPlan(false)}
+            onUpdated={report.reload}
           />
           <OwnerSupportDialog support={support} />
         </>

@@ -66,6 +66,14 @@ export const getWorkspace = (id) => get(endpoints.workspaces.details(id));
 export const extendTrial = (id, days) =>
   apiClient({ method: 'POST', url: url(endpoints.workspaces.extendTrial(id)), data: { days } });
 
+/** Move or change the plan, status, seats or billing interval of a workspace from the operator side. */
+export const changeWorkspacePlan = (id, payload) =>
+  apiClient({ method: 'POST', url: url(endpoints.workspaces.changePlan(id)), data: payload });
+
+/** Change plan for the workspace owning a given company. */
+export const changeCompanyPlan = (companyId, payload) =>
+  apiClient({ method: 'POST', url: url(endpoints.companies.changePlan(companyId)), data: payload });
+
 export const listCompanies = ({ workspaceId, ...rest } = {}) =>
   get(endpoints.companies.list, { ...rest, workspace_id: workspaceId });
 

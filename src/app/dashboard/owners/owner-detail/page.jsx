@@ -46,6 +46,7 @@ import { fOwnerDate, pluralize } from 'src/sections/owner/owner-utils';
 import { OwnerStatusLabel } from 'src/sections/owner/owner-status-label';
 import { OwnerActionDialog, useOwnerActions } from 'src/sections/owner/owner-actions';
 import { OwnerSupportDialog, useOwnerSupport } from 'src/sections/owner/owner-support-actions';
+import { ChangePlanDialog } from 'src/sections/workspaces/change-plan-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -260,7 +261,7 @@ function OwnerDetailView() {
             </Card>
           ) : (
             owner.workspaces.map((workspace) => (
-              <WorkspaceCard key={workspace.id} workspace={workspace} />
+              <WorkspaceCard key={workspace.id} workspace={workspace} onUpdated={load} />
             ))
           )}
         </Stack>
@@ -426,7 +427,9 @@ function SubscriptionSummary({ workspace }) {
   );
 }
 
-function WorkspaceCard({ workspace }) {
+function WorkspaceCard({ workspace, onUpdated }) {
+  const [changingPlan, setChangingPlan] = useState(false);
+
   return (
     <Card>
       <CardContent>
@@ -449,6 +452,9 @@ function WorkspaceCard({ workspace }) {
             <Label color={workspace.is_verified ? 'success' : 'default'}>
               {workspace.is_verified ? 'Verified' : 'Unverified'}
             </Label>
+            <Button size="small" variant="outlined" onClick={() => setChangingPlan(true)}>
+              Change plan
+            </Button>
             <Button
               size="small"
               component={RouterLink}
@@ -512,6 +518,13 @@ function WorkspaceCard({ workspace }) {
           </Table>
         </TableContainer>
       )}
+
+      <ChangePlanDialog
+        workspace={workspace}
+        open={changingPlan}
+        onClose={() => setChangingPlan(false)}
+        onUpdated={onUpdated}
+      />
     </Card>
   );
 }

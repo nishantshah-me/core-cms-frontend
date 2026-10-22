@@ -1,9 +1,12 @@
 'use client';
 
+import { useState } from 'react';
+
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Link from '@mui/material/Link';
 import Table from '@mui/material/Table';
+import Button from '@mui/material/Button';
 import TableRow from '@mui/material/TableRow';
 import TableHead from '@mui/material/TableHead';
 import TableBody from '@mui/material/TableBody';
@@ -29,6 +32,8 @@ import { ReportError } from 'src/sections/admin/report-error';
 import { usePagedList } from 'src/sections/admin/use-paged-list';
 import { toolbarSx, FilterSelect } from 'src/sections/admin/filter-select';
 
+import { ChangePlanDialog } from 'src/sections/workspaces/change-plan-dialog';
+
 // ----------------------------------------------------------------------
 
 const INDUSTRIES = [
@@ -38,12 +43,14 @@ const INDUSTRIES = [
   ),
 ];
 
-const COLUMN_COUNT = 7;
+const COLUMN_COUNT = 8;
 
 /** Every company across every workspace: a flat directory for finding one when all you know is its name. */
 export function CompaniesView() {
   const list = usePagedList(listCompanies, { initialFilters: { search: '', industry: '' } });
   const { filters, setFilter, rows, total, loading, error, reload } = list;
+
+  const [targetWorkspace, setTargetWorkspace] = useState(null);
 
   const waiting = loading && rows.length === 0;
   const filtered = Boolean(filters.search || filters.industry);
@@ -86,6 +93,7 @@ export function CompaniesView() {
                 <TableCell>Size</TableCell>
                 <TableCell align="right">Active people</TableCell>
                 <TableCell>Contact</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -156,6 +164,15 @@ export function CompaniesView() {
                       {row.phone ?? row.website ?? ''}
                     </Typography>
                   </TableCell>
+                  <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => setTargetWorkspace(row.workspace)}
+                    >
+                      Change plan
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -172,6 +189,13 @@ export function CompaniesView() {
           onRowsPerPageChange={(event) => list.setRowsPerPage(parseInt(event.target.value, 10))}
         />
       </Card>
+
+      <ChangePlanDialog
+        workspace={targetWorkspace}
+        open={Boolean(targetWorkspace)}
+        onClose={() => setTargetWorkspace(null)}
+        onUpdated={reload}
+      />
     </DashboardContent>
   );
 }

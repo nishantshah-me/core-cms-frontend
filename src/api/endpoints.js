@@ -38,8 +38,12 @@ export const endpoints = {
     list: '/admin/workspaces',
     details: (id) => `/admin/workspaces/${encodeURIComponent(id)}`,
     extendTrial: (id) => `/admin/workspaces/${encodeURIComponent(id)}/extend-trial`,
+    changePlan: (id) => `/admin/workspaces/${encodeURIComponent(id)}/change-plan`,
   },
-  companies: { list: '/admin/companies' },
+  companies: {
+    list: '/admin/companies',
+    changePlan: (id) => `/admin/companies/${encodeURIComponent(id)}/change-plan`,
+  },
   // Subscriptions, payments and the Razorpay event log (backend revenue_endpoints.py).
   subscriptions: { list: '/admin/subscriptions' },
   payments: { list: '/admin/payments' },

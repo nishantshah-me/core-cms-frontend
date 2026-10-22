@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Link from '@mui/material/Link';
 import Table from '@mui/material/Table';
+import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import TableRow from '@mui/material/TableRow';
 import TableHead from '@mui/material/TableHead';
@@ -38,6 +39,8 @@ import { usePagedList } from 'src/sections/admin/use-paged-list';
 import { SubscriptionStatusLabel } from 'src/sections/admin/status-labels';
 import { toolbarSx, FilterSelect } from 'src/sections/admin/filter-select';
 
+import { ChangePlanDialog } from './change-plan-dialog';
+
 // ----------------------------------------------------------------------
 
 const TABS = [
@@ -59,7 +62,7 @@ const SORTS = [
   { value: 'renews:asc', label: 'Renewing soonest' },
 ];
 
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 9;
 
 /** Who is on a trial and when it ends, or when a paid plan renews. */
 function planDetail(subscription) {
@@ -91,6 +94,8 @@ export function WorkspacesView() {
     },
   });
   const { filters, setFilter, patchFilters, result, rows, total, loading, error, reload } = list;
+
+  const [targetWorkspace, setTargetWorkspace] = useState(null);
 
   const distribution = useReport(() => getDistribution(), 'distribution');
   const planOptions = useMemo(
@@ -176,6 +181,7 @@ export function WorkspacesView() {
                 <TableCell align="right">MRR</TableCell>
                 <TableCell>Last active</TableCell>
                 <TableCell>Created</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -272,6 +278,18 @@ export function WorkspacesView() {
                     {fAgo(row.last_active_at, 'Never')}
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{fWhen(row.created_at)}</TableCell>
+                  <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setTargetWorkspace(row);
+                      }}
+                    >
+                      Change plan
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -288,6 +306,13 @@ export function WorkspacesView() {
           onRowsPerPageChange={(event) => list.setRowsPerPage(parseInt(event.target.value, 10))}
         />
       </Card>
+
+      <ChangePlanDialog
+        workspace={targetWorkspace}
+        open={Boolean(targetWorkspace)}
+        onClose={() => setTargetWorkspace(null)}
+        onUpdated={reload}
+      />
     </DashboardContent>
   );
 }
