@@ -60,8 +60,25 @@ export const previewMarkdown = (content, { signal } = {}) =>
  * The article is always saved as a draft (is_ai_generated); publishing stays a separate step. Starting while one is
  * already being written rejects with 409 and describeApiError(...).jobId, the job to follow instead.
  */
-export const startAiDraft = (topic) =>
-  axiosInstance.post(url(endpoints.blogs.aiGenerate), { topic: topic || null }).then(body);
+export const startAiDraft = ({ topic, provider, model } = {}) =>
+  axiosInstance
+    .post(url(endpoints.blogs.aiGenerate), {
+      topic: topic || null,
+      provider: provider || null,
+      model: model || null,
+    })
+    .then(body);
+
+/**
+ * The AI providers set up on the server -> { providers: [{ id, label, default_model }], auto: boolean }.
+ * `auto` is true when "Auto" (try each in turn, so a busy one doesn't stop the draft) has two or more to try.
+ */
+export const getAiProviders = ({ signal } = {}) =>
+  axiosInstance.get(url(endpoints.blogs.aiProviders), { signal }).then(body);
+
+/** One provider's models, fetched live -> { provider, default_model, models: [{ id, free }] } */
+export const getAiModels = (providerId, { signal } = {}) =>
+  axiosInstance.get(url(endpoints.blogs.aiModels(providerId)), { signal }).then(body);
 
 export const getAiDraftJob = (jobId, { signal } = {}) =>
   axiosInstance.get(url(endpoints.blogs.aiJob(jobId)), { signal }).then(body);

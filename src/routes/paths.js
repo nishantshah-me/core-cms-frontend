@@ -48,6 +48,7 @@ export const paths = {
     three: `${ROOTS.DASHBOARD}/three`,
     owners: `${ROOTS.DASHBOARD}/owners`,
     billing: `${ROOTS.DASHBOARD}/billing`,
+    aiProviders: `${ROOTS.DASHBOARD}/ai-providers`,
     analytics: `${ROOTS.DASHBOARD}/analytics`,
     workspaces: `${ROOTS.DASHBOARD}/workspaces`,
     workspaceDetails: (id) =>

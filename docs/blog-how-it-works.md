@@ -67,10 +67,14 @@ and the AI picks one that isn't covered yet, then click **Write draft**.
 - The result is always a **Draft** with a small **AI** label next to its title. **It is never published for you**:
   read it, fix anything wrong (facts, tone, the one sentence about the product), add a cover picture, then publish
   it like any other post (step 3).
+- **Which AI writes it.** The window offers every AI provider that has a key on the backend (section 6): Google
+  Gemini, Groq, OpenRouter, Cerebras, Mistral, or one of your own. Most have a free tier. Pick **Auto** to try them one
+  after another: if Gemini is busy (a 503) the next one takes over, so the button rarely fails. Or pick one provider
+  and then a **model** from its live list (OpenRouter shows only the free ones), or type any model name it accepts.
+  Free tiers have daily and per-minute limits, and free models come and go, so if one stops working just pick another.
 - One article is written at a time. If someone else already started one, the window follows that one instead.
-- If it fails, the window says why (for example "Gemini is rate limiting requests right now"). Just try again.
-- It needs `GEMINI_API_KEY` on the backend (section 6). Without it the button answers "AI drafts are not set up on
-  this server".
+- If it fails, the window says why (for example "Groq is rate limiting requests"). Pick another provider or try again.
+- It needs at least one provider key. Add them under **AI providers** in the left menu (or as server settings, section 6). With none, the window says no AI provider is set up.
 
 Things worth knowing:
 
@@ -325,13 +329,29 @@ Set each in **only the place shown**.
 | `BLOG_MEDIA_PUBLIC_BASE_URL` | Door B: the public picture domain (`https://media.officeous.com`). No trailing slash, **no bucket name** in it. | Production (after doing 4.3). |
 | `BLOG_API_PUBLIC_URL` | Door A: the backend's own address (`https://api.officeous.com`). | Any environment **without** `BLOG_MEDIA_PUBLIC_BASE_URL`. |
 | `AWS_*` (keys, bucket name, endpoint) | How the backend reaches R2. | Already set. |
-| `GEMINI_API_KEY` | Google AI key for **Write with AI** (get one at aistudio.google.com/apikey). Keep it secret. | Wherever you want the button to work. Without it the button says AI drafts are not set up. |
-| `GEMINI_MODEL` | Which Gemini model writes the article. Defaults to `gemini-3.8-flash`. | Only to switch models. |
+| `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `CEREBRAS_API_KEY`, `MISTRAL_API_KEY` | One key per AI provider for **Write with AI**. You no longer have to set these on Heroku: **AI providers** in the left menu saves them (encrypted) and a key saved there wins over the setting. This is the fallback (free keys: aistudio.google.com/apikey, console.groq.com/keys, openrouter.ai/keys, cloud.cerebras.ai, console.mistral.ai). Keep them secret. A provider appears in the window only when its key is set. | Set at least one wherever you want the button to work; set two or more so **Auto** has a fallback. |
+| `GEMINI_MODEL`, `GROQ_MODEL`, `OPENROUTER_MODEL`, `CEREBRAS_MODEL`, `MISTRAL_MODEL` | The model each provider uses unless you pick another in the window. | Only to change the default (free models get retired; the window's list is always current). |
+| `LLM_CUSTOM_BASE_URL`, `LLM_CUSTOM_API_KEY`, `LLM_CUSTOM_MODEL`, `LLM_CUSTOM_LABEL` | Any other OpenAI-compatible service (GitHub Models, NVIDIA, a gateway of your own). The URL is the part before `/chat/completions` and must be `https`. | Only if you use such a service. |
+| `AI_PROVIDER_ORDER` | The order **Auto** tries providers in, e.g. `gemini,groq,openrouter,cerebras,mistral,custom`. A provider left out is never used by Auto but can still be picked by hand. | Only to change the order. |
 
 ```bash
 heroku config:set BLOG_MEDIA_PUBLIC_BASE_URL=https://media.officeous.com -a hexa-hrms-prod
 heroku config:set BLOG_API_PUBLIC_URL=https://api-dev.officeous.com -a hexa-backend-dev
 ```
+
+#### AI provider keys: where to put them
+
+Two places, and the dashboard wins:
+
+1. **Dashboard → AI providers** (recommended). Pick a provider, **Set key**, paste it, **Save**. Keys are stored
+   encrypted and are **never shown again**, only the last four characters. **Test** asks the provider for its model
+   list (no tokens are spent) to prove the key works; **Remove** deletes the saved key.
+2. The server settings above. A provider shows **Server setting** until you save a key in the dashboard, which then
+   shows **Saved here** and replaces it; **Remove** brings the server setting back.
+
+These keys are Officeous's own and run **Write with AI** on the Blogs page only. Customers add *their own* keys in the
+HR app (Company details → Preferences → AI providers); those are separate, stay inside their company, and are never
+used for Officeous's work.
 
 ### CMS dashboard (Vercel environment variables)
 

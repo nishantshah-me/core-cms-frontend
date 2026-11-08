@@ -65,9 +65,19 @@ export const endpoints = {
     // "Write with AI": POST starts a job, GET reads one (or the one running now).
     aiGenerate: '/api/v1/admin/blogs/ai-generate',
     aiActive: '/api/v1/admin/blogs/ai-generate/active',
+    aiProviders: '/api/v1/admin/blogs/ai-generate/providers',
+    aiModels: (providerId) =>
+      `/api/v1/admin/blogs/ai-generate/providers/${encodeURIComponent(providerId)}/models`,
     aiJob: (id) => `/api/v1/admin/blogs/ai-generate/${encodeURIComponent(id)}`,
     categories: '/api/v1/admin/blogs/categories',
     category: (id) => `/api/v1/admin/blogs/categories/${encodeURIComponent(id)}`,
+  },
+  // Officeous's own AI provider keys (backend app/api/admin/ai_provider_endpoints.py): the blog's "Write with AI"
+  // runs on them. Keys are write-only; reads return only where a key comes from and its last four characters.
+  aiProviders: {
+    root: '/admin/ai-providers',
+    provider: (id) => `/admin/ai-providers/${encodeURIComponent(id)}`,
+    test: (id) => `/admin/ai-providers/${encodeURIComponent(id)}/test`,
   },
   // Billing configuration (backend app/api/admin/billing_endpoints.py): the master switch, currencies, trial
   // length, plans and per-seat prices, and creating the matching Razorpay plans.

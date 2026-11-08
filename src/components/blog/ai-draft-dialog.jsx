@@ -8,25 +8,34 @@ import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
+import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
+import Autocomplete from '@mui/material/Autocomplete';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import LinearProgress from '@mui/material/LinearProgress';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
 import {
   startAiDraft,
+  getAiModels,
   getAiDraftJob,
+  getAiProviders,
   describeApiError,
   getActiveAiDraftJob,
 } from 'src/auth/services/blogService';
 
 // ----------------------------------------------------------------------
-// "Write with AI". One click asks the backend to write an article with Gemini and save it as a DRAFT. That takes
+// "Write with AI". One click asks the backend to write an article with an LLM and save it as a DRAFT. That takes
 // 1-3 minutes and a request cannot wait that long, so the backend answers at once with a job and this component
 // polls it. The article is never published here: the finished draft opens in the editor for a person to review.
+//
+// Which LLM: the providers set up on the server are offered (Gemini, Groq, OpenRouter, ... : see the backend's
+// AI_* settings). "Auto" tries them in turn, so one being busy (Gemini's 503) doesn't stop the draft; or pick one and
+// a model from its live list, or type any model name it accepts.
 //
 // The component stays mounted while the dialog is closed, so a job that is running keeps being followed (and the
 // list is refreshed when it finishes), and a page reload picks a running job back up.
@@ -35,6 +44,7 @@ import {
 const POLL_MS = 3000;
 const MAX_POLL_FAILURES = 5;
 const TOPIC_MAX = 300;
+const AUTO = 'auto';
 
 const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
@@ -42,6 +52,10 @@ export function AiDraftDialog({ open, onClose, onFinished, onBusyChange }) {
   const router = useRouter();
 
   const [topic, setTopic] = useState('');
+  const [config, setConfig] = useState({ status: 'idle', providers: [], auto: false });
+  const [provider, setProvider] = useState(''); // AUTO or a provider id
+  const [model, setModel] = useState('');
+  const [modelList, setModelList] = useState({ status: 'idle', items: [] });
   const [job, setJob] = useState(null); // the job being written, if any
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
@@ -54,6 +68,7 @@ export function AiDraftDialog({ open, onClose, onFinished, onBusyChange }) {
   const working = Boolean(job) && (job.status === 'QUEUED' || job.status === 'RUNNING');
   const jobId = working ? job.id : null;
   const startedAt = working ? job.created_at : null;
+  const labelFor = (id) => config.providers.find((p) => p.id === id)?.label || id;
 
   // A reload, another tab or a second click can leave a job running: follow it.
   useEffect(() => {
@@ -69,6 +84,44 @@ export function AiDraftDialog({ open, onClose, onFinished, onBusyChange }) {
   useEffect(() => {
     onBusyChange?.(working || starting);
   }, [working, starting, onBusyChange]);
+
+  // Which providers are set up, each time the dialog opens (keys are added without a redeploy of this app).
+  useEffect(() => {
+    if (!open || working) return undefined;
+    const controller = new AbortController();
+    setConfig((previous) => ({ ...previous, status: 'loading' }));
+    getAiProviders({ signal: controller.signal })
+      .then((data) => {
+        setConfig({ status: 'ready', providers: data.providers, auto: data.auto });
+        setProvider((current) => {
+          const stillValid =
+            current === AUTO ? data.auto : data.providers.some((p) => p.id === current);
+          if (stillValid) return current;
+          return data.auto ? AUTO : data.providers[0]?.id || '';
+        });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setConfig({ status: 'error', providers: [], auto: false });
+      });
+    return () => controller.abort();
+  }, [open, working]);
+
+  // The chosen provider's models, fetched live because free model lists change often. The server caches them.
+  useEffect(() => {
+    if (!open || !provider || provider === AUTO) {
+      setModelList({ status: 'idle', items: [] });
+      return undefined;
+    }
+    setModel(config.providers.find((p) => p.id === provider)?.default_model || '');
+    const controller = new AbortController();
+    setModelList({ status: 'loading', items: [] });
+    getAiModels(provider, { signal: controller.signal })
+      .then((data) => setModelList({ status: 'ready', items: data.models }))
+      .catch(() => {
+        if (!controller.signal.aborted) setModelList({ status: 'error', items: [] });
+      });
+    return () => controller.abort();
+  }, [open, provider, config.providers]);
 
   // Poll while a job is running. A few failed polls in a row end the wait (the job itself carries on server-side).
   useEffect(() => {
@@ -116,11 +169,12 @@ export function AiDraftDialog({ open, onClose, onFinished, onBusyChange }) {
     if (job.status === 'SUCCEEDED' && job.post) {
       handledRef.current = job.id;
       setJob(null);
+      const by = job.used_model ? ` (written by ${job.used_model})` : '';
       if (openRef.current) {
-        toast.success('Draft ready. Opening it for review…');
+        toast.success(`Draft ready${by}. Opening it for review…`);
         router.push(paths.dashboard.blogs.edit(job.post.id));
       } else {
-        toast.success(`Draft ready: “${job.post.title}”`);
+        toast.success(`Draft ready${by}: “${job.post.title}”`);
         onFinished?.();
       }
     } else if (job.status === 'FAILED') {
@@ -135,7 +189,14 @@ export function AiDraftDialog({ open, onClose, onFinished, onBusyChange }) {
     setError('');
     setStarting(true);
     try {
-      setJob(await startAiDraft(topic.trim()));
+      const explicit = provider !== AUTO;
+      setJob(
+        await startAiDraft({
+          topic: topic.trim(),
+          provider: explicit ? provider : undefined,
+          model: explicit ? model.trim() : undefined,
+        })
+      );
       setTopic('');
     } catch (err) {
       const info = describeApiError(err, 'Could not start the draft.');
@@ -154,6 +215,17 @@ export function AiDraftDialog({ open, onClose, onFinished, onBusyChange }) {
     }
   };
 
+  const noProviders = config.status === 'ready' && config.providers.length === 0;
+  const modelHelp = {
+    loading: 'Loading models…',
+    error: 'Couldn’t load this provider’s model list. You can still type a model name.',
+    ready:
+      provider === 'openrouter'
+        ? 'Free models only. Pick one, or type a model name.'
+        : 'Pick one, or type a model name.',
+    idle: '',
+  }[modelList.status];
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" aria-labelledby="ai-draft-title">
       <DialogTitle id="ai-draft-title">Write with AI</DialogTitle>
@@ -162,8 +234,11 @@ export function AiDraftDialog({ open, onClose, onFinished, onBusyChange }) {
         {working ? (
           <Stack spacing={2} sx={{ pt: 1 }}>
             <Typography variant="body2">
-              Writing the article{job.topic ? ` about “${job.topic}”` : ''}…{' '}
-              <strong>{clock(elapsed)}</strong>
+              Writing the article{job.topic ? ` about “${job.topic}”` : ''}
+              {job.provider && job.provider !== AUTO
+                ? ` with ${labelFor(job.provider)}${job.model ? ` (${job.model})` : ''}`
+                : ', trying your AI providers in turn'}
+              … <strong>{clock(elapsed)}</strong>
             </Typography>
             <LinearProgress />
             <Typography variant="caption" color="text.secondary">
@@ -177,6 +252,66 @@ export function AiDraftDialog({ open, onClose, onFinished, onBusyChange }) {
               The AI writes one article and saves it as a <strong>draft</strong>. Nothing goes live
               until you review and publish it.
             </Typography>
+
+            {noProviders && (
+              <Alert severity="warning">
+                No AI provider is set up on the server yet. Add an API key to its settings (for
+                example GROQ_API_KEY or GEMINI_API_KEY), then reopen this window.
+              </Alert>
+            )}
+
+            {config.providers.length > 0 && (
+              <TextField
+                select
+                label="AI provider"
+                value={provider}
+                onChange={(event) => setProvider(event.target.value)}
+                helperText={
+                  provider === AUTO
+                    ? 'Tries each provider in turn, so one being busy doesn’t stop the draft.'
+                    : ' '
+                }
+                disabled={starting}
+                fullWidth
+              >
+                {config.auto && <MenuItem value={AUTO}>Auto (try each in turn)</MenuItem>}
+                {config.providers.map((p) => (
+                  <MenuItem key={p.id} value={p.id}>
+                    {p.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+
+            {provider && provider !== AUTO && (
+              <Autocomplete
+                freeSolo
+                options={modelList.items.map((item) => item.id)}
+                inputValue={model}
+                onInputChange={(_, value) => setModel(value)}
+                loading={modelList.status === 'loading'}
+                disabled={starting}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Model"
+                    helperText={modelHelp}
+                    slotProps={{
+                      input: {
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {modelList.status === 'loading' ? <CircularProgress size={18} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      },
+                    }}
+                  />
+                )}
+              />
+            )}
+
             <TextField
               label="Topic (optional)"
               placeholder="e.g. How to handle probation period reviews"
@@ -198,7 +333,11 @@ export function AiDraftDialog({ open, onClose, onFinished, onBusyChange }) {
           {working ? 'Close' : 'Cancel'}
         </Button>
         {!working && (
-          <Button variant="contained" onClick={start} disabled={starting}>
+          <Button
+            variant="contained"
+            onClick={start}
+            disabled={starting || noProviders || !provider || (provider !== AUTO && !model.trim())}
+          >
             {starting ? 'Starting…' : 'Write draft'}
           </Button>
         )}

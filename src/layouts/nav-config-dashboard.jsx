@@ -81,6 +81,7 @@ const _workspaces_Officeous = [
         icon: ICONS.blog,
         // info: <Label>v{CONFIG.appVersion}</Label>,
       },
+      { title: 'AI providers', path: paths.dashboard.aiProviders, icon: ICONS.lock },
       {
         title: 'Jobs',
         icon: ICONS.job,
