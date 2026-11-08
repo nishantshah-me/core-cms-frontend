@@ -39,6 +39,7 @@ import TableSortLabel from '@mui/material/TableSortLabel';
 import TablePagination from '@mui/material/TablePagination';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ImageIcon from '@mui/icons-material/Image';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -56,6 +57,7 @@ import {
 } from 'src/auth/services/blogService';
 
 import { BlogProse } from './blog-prose';
+import { AiDraftDialog } from './ai-draft-dialog';
 import { CategoriesDialog } from './categories-dialog';
 import { statusKey, statusLabel } from './blog-utils';
 
@@ -110,6 +112,8 @@ export function BlogListView() {
   const [deleting, setDeleting] = useState(false);
   const [previewId, setPreviewId] = useState(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false); // an article is being written right now
 
   useEffect(() => {
     listBlogCategories().then(setCategories).catch(() => setCategories([]));
@@ -199,6 +203,9 @@ export function BlogListView() {
         <Stack direction="row" spacing={1.5}>
           <Button variant="outlined" color="inherit" onClick={() => setCategoriesOpen(true)}>
             Categories
+          </Button>
+          <Button variant="outlined" startIcon={<AutoAwesomeIcon />} onClick={() => setAiOpen(true)}>
+            {aiBusy ? 'Writing…' : 'Write with AI'}
           </Button>
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => router.push(paths.dashboard.blogs.new)}>
             New post
@@ -365,9 +372,12 @@ export function BlogListView() {
                       </Avatar>
                     </TableCell>
                     <TableCell sx={{ maxWidth: 360 }}>
-                      <Link component="button" type="button" variant="subtitle2" color="text.primary" underline="hover" onClick={() => edit(post)} sx={{ textAlign: 'left' }}>
-                        {post.title}
-                      </Link>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Link component="button" type="button" variant="subtitle2" color="text.primary" underline="hover" onClick={() => edit(post)} sx={{ textAlign: 'left' }}>
+                          {post.title}
+                        </Link>
+                        {post.is_ai_generated && <Label color="info">AI</Label>}
+                      </Stack>
                       <Typography variant="caption" color="text.secondary" component="div" noWrap>
                         /{post.slug}
                       </Typography>
@@ -452,6 +462,8 @@ export function BlogListView() {
         }}
         onChanged={setCategories}
       />
+
+      <AiDraftDialog open={aiOpen} onClose={() => setAiOpen(false)} onFinished={reload} onBusyChange={setAiBusy} />
     </Container>
   );
 }
@@ -487,7 +499,8 @@ function BlogPreviewDialog({ blogId, onClose, onEdit }) {
           <Box component="article" sx={{ maxWidth: 720, mx: 'auto' }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
               <Label color={statusLabel(post).color}>{statusLabel(post).label}</Label>
-              {post.category && <Typography variant="caption" color="text.secondary">{post.category.name}</Typography>}
+              {post.is_ai_generated && <Label color="info">AI</Label>}
+              {post.category &&<Typography variant="caption" color="text.secondary">{post.category.name}</Typography>}
               <Typography variant="caption" color="text.secondary">{post.reading_time_minutes} min read</Typography>
             </Stack>
             <Typography variant="h3" component="h1" sx={{ mb: 1 }}>

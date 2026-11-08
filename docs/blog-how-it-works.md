@@ -59,6 +59,19 @@ will not show up (see section 7).
    the background). So a change can take **a few minutes** to show everywhere. That is
    normal, not a bug.
 
+**Or let the AI write the first version.** Dashboard → Blogs → **Write with AI**. Type a topic, or leave it empty
+and the AI picks one that isn't covered yet, then click **Write draft**.
+
+- It takes **one to three minutes**. You can close the window; a message appears and the list refreshes when the draft
+  is done. If you stay on the window, the finished draft opens in the editor for you.
+- The result is always a **Draft** with a small **AI** label next to its title. **It is never published for you**:
+  read it, fix anything wrong (facts, tone, the one sentence about the product), add a cover picture, then publish
+  it like any other post (step 3).
+- One article is written at a time. If someone else already started one, the window follows that one instead.
+- If it fails, the window says why (for example "Gemini is rate limiting requests right now"). Just try again.
+- It needs `GEMINI_API_KEY` on the backend (section 6). Without it the button answers "AI drafts are not set up on
+  this server".
+
 Things worth knowing:
 
 - **The article text is made safe by the backend.** If someone writes `<script>` in an
@@ -312,6 +325,8 @@ Set each in **only the place shown**.
 | `BLOG_MEDIA_PUBLIC_BASE_URL` | Door B: the public picture domain (`https://media.officeous.com`). No trailing slash, **no bucket name** in it. | Production (after doing 4.3). |
 | `BLOG_API_PUBLIC_URL` | Door A: the backend's own address (`https://api.officeous.com`). | Any environment **without** `BLOG_MEDIA_PUBLIC_BASE_URL`. |
 | `AWS_*` (keys, bucket name, endpoint) | How the backend reaches R2. | Already set. |
+| `GEMINI_API_KEY` | Google AI key for **Write with AI** (get one at aistudio.google.com/apikey). Keep it secret. | Wherever you want the button to work. Without it the button says AI drafts are not set up. |
+| `GEMINI_MODEL` | Which Gemini model writes the article. Defaults to `gemini-3.8-flash`. | Only to switch models. |
 
 ```bash
 heroku config:set BLOG_MEDIA_PUBLIC_BASE_URL=https://media.officeous.com -a hexa-hrms-prod

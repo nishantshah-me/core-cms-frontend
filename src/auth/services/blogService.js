@@ -53,6 +53,23 @@ export const uploadBlogImage = (file, onProgress) => {
 export const previewMarkdown = (content, { signal } = {}) =>
   axiosInstance.post(url(endpoints.blogs.preview), { content }, { signal }).then(body);
 
+/**
+ * "Write with AI". Starting is instant (the backend writes in the background and Heroku cuts a request off at 30
+ * seconds, while Gemini takes minutes), so these return a job to poll:
+ * { id, status: 'QUEUED'|'RUNNING'|'SUCCEEDED'|'FAILED', topic, error, created_at, post: { id, slug, title } | null }
+ * The article is always saved as a draft (is_ai_generated); publishing stays a separate step. Starting while one is
+ * already being written rejects with 409 and describeApiError(...).jobId, the job to follow instead.
+ */
+export const startAiDraft = (topic) =>
+  axiosInstance.post(url(endpoints.blogs.aiGenerate), { topic: topic || null }).then(body);
+
+export const getAiDraftJob = (jobId, { signal } = {}) =>
+  axiosInstance.get(url(endpoints.blogs.aiJob(jobId)), { signal }).then(body);
+
+/** The job being written right now, or null. Lets a reloaded page pick it back up. */
+export const getActiveAiDraftJob = ({ signal } = {}) =>
+  axiosInstance.get(url(endpoints.blogs.aiActive), { signal }).then(body);
+
 export const listBlogCategories = () => axiosInstance.get(url(endpoints.blogs.categories)).then(body);
 
 export const createBlogCategory = (payload) =>
@@ -72,14 +89,14 @@ const cleanMessage = (message) => String(message || '').replace(/^Value error,\s
 
 /**
  * Turns whatever the backend (or the network) threw into
- * { status, message, fieldErrors: { <field>: message }, suggestedSlug }.
+ * { status, message, fieldErrors: { <field>: message }, suggestedSlug, jobId }.
  * FastAPI reports validation as [{ loc: ['body', 'field'], msg }], rule failures the same
  * way, and conflicts/other errors as a string or { message, field, suggested_slug }.
  */
 export function describeApiError(error, fallback = 'Something went wrong. Please try again.') {
   const status = error?.response?.status ?? null;
   const detail = error?.response?.data?.detail;
-  const result = { status, message: fallback, fieldErrors: {}, suggestedSlug: null };
+  const result = { status, message: fallback, fieldErrors: {}, suggestedSlug: null, jobId: null };
 
   if (!error?.response) {
     result.message =
@@ -97,6 +114,7 @@ export function describeApiError(error, fallback = 'Something went wrong. Please
     result.message = detail.message || fallback;
     if (detail.field) result.fieldErrors[detail.field] = result.message;
     result.suggestedSlug = detail.suggested_slug || null;
+    result.jobId = detail.job_id || null;
   } else if (typeof detail === 'string') {
     result.message = detail;
   } else if (status === 403) {

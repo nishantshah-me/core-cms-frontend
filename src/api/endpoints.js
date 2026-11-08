@@ -62,6 +62,10 @@ export const endpoints = {
     details: (id) => `/api/v1/admin/blogs/${encodeURIComponent(id)}`,
     uploadImage: '/api/v1/admin/blogs/upload-image',
     preview: '/api/v1/admin/blogs/preview',
+    // "Write with AI": POST starts a job, GET reads one (or the one running now).
+    aiGenerate: '/api/v1/admin/blogs/ai-generate',
+    aiActive: '/api/v1/admin/blogs/ai-generate/active',
+    aiJob: (id) => `/api/v1/admin/blogs/ai-generate/${encodeURIComponent(id)}`,
     categories: '/api/v1/admin/blogs/categories',
     category: (id) => `/api/v1/admin/blogs/categories/${encodeURIComponent(id)}`,
   },
