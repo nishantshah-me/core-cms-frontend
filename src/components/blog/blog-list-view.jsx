@@ -52,12 +52,14 @@ import {
   getBlog,
   listBlogs,
   deleteBlog,
+  updateBlog,
   describeApiError,
   listBlogCategories,
 } from 'src/auth/services/blogService';
 
 import { BlogProse } from './blog-prose';
 import { AiDraftDialog } from './ai-draft-dialog';
+import { AiCoverDialog } from './ai-cover-dialog';
 import { CategoriesDialog } from './categories-dialog';
 import { statusKey, statusLabel } from './blog-utils';
 
@@ -111,6 +113,8 @@ export function BlogListView() {
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [previewId, setPreviewId] = useState(null);
+  const [coverPost, setCoverPost] = useState(null); // the post whose cover is being drawn with AI
+  const [coverOpen, setCoverOpen] = useState(false); // separate, so the title stays while the dialog fades out
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiBusy, setAiBusy] = useState(false); // an article is being written right now
@@ -172,6 +176,13 @@ export function BlogListView() {
 
   const closeMenu = () => setMenu({ anchor: null, post: null });
   const edit = (post) => router.push(paths.dashboard.blogs.edit(post.id));
+
+  // Saves the AI picture straight onto the post: only the cover fields change.
+  const applyAiCover = async (cover) => {
+    await updateBlog(coverPost.id, { cover_image_url: cover.url, cover_image_alt: cover.alt });
+    toast.success(`Cover image updated for “${coverPost.title}”`);
+    reload();
+  };
 
   const confirmDelete = async () => {
     setDeleting(true);
@@ -420,6 +431,9 @@ export function BlogListView() {
         <MenuItem onClick={() => { setPreviewId(menu.post.id); closeMenu(); }}>
           <VisibilityIcon fontSize="small" sx={{ mr: 1 }} /> Preview
         </MenuItem>
+        <MenuItem onClick={() => { setCoverPost(menu.post); setCoverOpen(true); closeMenu(); }}>
+          <AutoAwesomeIcon fontSize="small" sx={{ mr: 1 }} /> Generate cover with AI
+        </MenuItem>
         {menu.post && statusKey(menu.post) === 'PUBLISHED' && (
           <MenuItem component="a" href={menu.post.public_url} target="_blank" rel="noopener noreferrer" onClick={closeMenu}>
             <OpenInNewIcon fontSize="small" sx={{ mr: 1 }} /> View live
@@ -461,6 +475,15 @@ export function BlogListView() {
           reload();
         }}
         onChanged={setCategories}
+      />
+
+      <AiCoverDialog
+        open={coverOpen}
+        onClose={() => setCoverOpen(false)}
+        title={coverPost?.title || ''}
+        summary={coverPost?.summary || ''}
+        hasCover={Boolean(coverPost?.cover_image_url)}
+        onApply={applyAiCover}
       />
 
       <AiDraftDialog open={aiOpen} onClose={() => setAiOpen(false)} onFinished={reload} onBusyChange={setAiBusy} />

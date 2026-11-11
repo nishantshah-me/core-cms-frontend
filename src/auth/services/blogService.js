@@ -49,6 +49,19 @@ export const uploadBlogImage = (file, onProgress) => {
     .then(body);
 };
 
+/**
+ * "Generate with AI" for a cover image. The backend draws the picture from the post's title (and summary, and an
+ * optional hint) and stores it the way an upload is stored; it attaches nothing to a post, so the caller puts the
+ * result on the post. Takes 5-20 seconds.
+ * -> { url, width, height, size_bytes, content_type, alt, provider, model }
+ * Rejects with 503 when no Gemini key is set up, 429 after too many in an hour, 502 when the model fails or refuses
+ * (describeApiError(...).message says why in words an editor can act on).
+ */
+export const generateAiCover = ({ title, summary, prompt }, { signal } = {}) =>
+  axiosInstance
+    .post(url(endpoints.blogs.aiCoverImage), { title, summary: summary || null, prompt: prompt || null }, { signal })
+    .then(body);
+
 /** Renders Markdown exactly as the public site will -> { html, toc, reading_time_minutes } */
 export const previewMarkdown = (content, { signal } = {}) =>
   axiosInstance.post(url(endpoints.blogs.preview), { content }, { signal }).then(body);

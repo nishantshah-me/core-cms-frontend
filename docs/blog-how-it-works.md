@@ -76,6 +76,24 @@ and the AI picks one that isn't covered yet, then click **Write draft**.
 - If it fails, the window says why (for example "Groq is rate limiting requests"). Pick another provider or try again.
 - It needs at least one provider key. Add them under **AI providers** in the left menu (or as server settings, section 6). With none, the window says no AI provider is set up.
 
+**Or let the AI draw the cover.** Two places, same window:
+
+- In the editor, **Generate with AI** next to **Cover image** (needs a title; the summary, if there is one, helps).
+- In the Blogs list, the **⋮** menu of any post → **Generate cover with AI**.
+
+Optionally describe what the picture should show, click **Generate**, and wait 10 to 20 seconds. You can **Try
+again** as often as you like, edit the **alt text**, then click **Use this image**. Nothing changes on the post until
+you do. In the editor the picture goes into the form like an upload (it is saved with the post when you save). From
+the list it is saved onto that post straight away, replacing its current cover.
+
+- Only **Google Gemini** can draw (the other providers write text only), so this needs a Gemini key (**AI providers**
+  in the left menu, or `GEMINI_API_KEY`). Without one the window says it is not set up. The model is
+  `GEMINI_IMAGE_MODEL` (default `gemini-2.5-flash-image`); a free key may not include image generation, and then
+  Gemini's own message is shown.
+- The picture is stored exactly like an uploaded one (section 4): cleaned, turned into WebP, random file name.
+- At most **20 covers an hour**, so a stuck button can't run up a bill.
+- The alt text starts as "Illustration for the article “<title>”". Improve it if you can describe the picture better.
+
 Things worth knowing:
 
 - **The article text is made safe by the backend.** If someone writes `<script>` in an

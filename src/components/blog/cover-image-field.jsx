@@ -1,30 +1,39 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useFormContext } from 'react-hook-form';
+import { useWatch, useFormContext } from 'react-hook-form';
 
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 
 import { Field } from 'src/components/hook-form';
 import { uploadBlogImage, describeApiError } from 'src/auth/services/blogService';
 
+import { AiCoverDialog } from './ai-cover-dialog';
 import { IMAGE_TYPES, MAX_IMAGE_BYTES, formatFileSize } from './blog-utils';
 
 // ----------------------------------------------------------------------
 
-/** Cover image: upload (click or drop), preview, and the alt text the page can't do without. */
+/**
+ * Cover image: upload (click or drop) or draw one with AI, preview, and the alt text the page can't do without.
+ * An AI picture is only put in the form (and saved with the post when the author saves), like an upload.
+ */
 export function CoverImageField() {
-  const { watch, setValue, clearErrors } = useFormContext();
+  const { watch, control, setValue, clearErrors } = useFormContext();
   const url = watch('cover_image_url');
+  const title = useWatch({ control, name: 'title' }) || '';
+  const summary = useWatch({ control, name: 'summary' }) || '';
 
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [state, setState] = useState({ uploading: false, percent: 0, error: '', info: '' });
 
   const upload = async (file) => {
@@ -53,6 +62,19 @@ export function CoverImageField() {
     }
   };
 
+  const applyAiCover = (result) => {
+    setValue('cover_image_url', result.url, { shouldDirty: true, shouldValidate: true });
+    // The old alt text described the old picture.
+    setValue('cover_image_alt', result.alt, { shouldDirty: true, shouldValidate: true });
+    clearErrors(['cover_image_url', 'cover_image_alt']);
+    setState({
+      uploading: false,
+      percent: 100,
+      error: '',
+      info: `${result.width} × ${result.height}px · ${formatFileSize(result.size_bytes)} (AI generated)`,
+    });
+  };
+
   const remove = () => {
     setValue('cover_image_url', '', { shouldDirty: true });
     setValue('cover_image_alt', '', { shouldDirty: true });
@@ -62,7 +84,22 @@ export function CoverImageField() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="subtitle2">Cover image</Typography>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+        <Typography variant="subtitle2">Cover image</Typography>
+        <Tooltip title={title.trim() ? '' : 'Add a title first: the AI draws the cover from it'}>
+          <span>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<AutoAwesomeIcon />}
+              onClick={() => setAiOpen(true)}
+              disabled={state.uploading || !title.trim()}
+            >
+              Generate with AI
+            </Button>
+          </span>
+        </Tooltip>
+      </Stack>
 
       {url ? (
         <Box sx={{ position: 'relative' }}>
@@ -158,6 +195,15 @@ export function CoverImageField() {
           helperText="Required. Read aloud by screen readers and used by search engines."
         />
       )}
+
+      <AiCoverDialog
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        title={title.trim()}
+        summary={summary.trim()}
+        hasCover={Boolean(url)}
+        onApply={applyAiCover}
+      />
     </Stack>
   );
 }

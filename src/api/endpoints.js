@@ -69,6 +69,8 @@ export const endpoints = {
     aiModels: (providerId) =>
       `/api/v1/admin/blogs/ai-generate/providers/${encodeURIComponent(providerId)}/models`,
     aiJob: (id) => `/api/v1/admin/blogs/ai-generate/${encodeURIComponent(id)}`,
+    // "Generate with AI" for a cover image: one synchronous POST that draws the picture and stores it.
+    aiCoverImage: '/api/v1/admin/blogs/ai-cover-image',
     categories: '/api/v1/admin/blogs/categories',
     category: (id) => `/api/v1/admin/blogs/categories/${encodeURIComponent(id)}`,
   },
